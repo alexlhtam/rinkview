@@ -178,6 +178,17 @@ def test_goalie_heuristic_only_relabels_generic_people(rink):
     assert assigned[2].role == "goalie"
 
 
+def test_crease_occupancy_takes_priority_over_plain_official_cue(rink):
+    dark = (74, 74, 74)
+    tracks = {
+        1: observations(0, 12, 1, dark, x0=-rink.goal_x, role="person"),
+        2: observations(0, 12, 2, dark, role="person"),
+    }
+    assigned, _ = classify(tracks, rink)
+    assert assigned[1].role == "goalie"
+    assert assigned[2] == Assignment("referee", "none")
+
+
 def test_jersey_features_detect_stripes_and_plain_official_kits():
     box = (0, 0, 36, 80)
     dark = np.full((80, 36, 3), 74, np.uint8)

@@ -112,14 +112,14 @@ class Assignment:
 
 def classify(tracks, rink, a_defends=None):
     jerseys, centre_jerseys, roles, goalie_end, goalie_candidates = {}, {}, {}, {}, {-1: [], 1: []}
+    plain_officials = set()
     for track_id, observations in tracks.items():
         votes = Counter(o.tracked.ice.detection.role for o in observations)
         votes.pop("person", None)
         generic = not votes
         roles[track_id] = "player" if generic else votes.most_common(1)[0][0]
         if generic and _looks_like_plain_official(observations):
-            roles[track_id] = "referee"
-            continue
+            plain_officials.add(track_id)
         confident = sorted(
             (o for o in observations if o.jersey is not None),
             key=lambda o: -o.tracked.ice.detection.conf,
@@ -151,6 +151,9 @@ def classify(tracks, rink, a_defends=None):
             _, track_id = max(candidates)
             roles[track_id] = "goalie"
             goalie_end[track_id] = end
+
+    for track_id in plain_officials - goalie_end.keys():
+        roles[track_id] = "referee"
 
     centres = two_means([feature for i, feature in centre_jerseys.items() if roles[i] == "player"])
     if centres is None:
