@@ -1,4 +1,5 @@
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 
 from rinkview_cv.cli import main
 from rinkview_cv.detect import Detection
+from rinkview_cv.image import analyze_image
 
 
 class Detector:
@@ -37,6 +39,25 @@ def test_detect_image_cli_outputs_json(screenshot, monkeypatch, capsys):
     assert [d["role"] for d in result["detections"][:4]] == ["player", "player", "referee", "goalie"]
     assert result["detections"][0]["foot_px"] == [23, 58.65]
     assert "x_m" not in result["detections"][0]
+
+
+def test_analyze_rotates_exif_jpeg_before_detection():
+    pixels = np.zeros((40, 80, 3), np.uint8)
+    pixels[:20, :40] = (0, 0, 255)
+    ok, jpeg = cv2.imencode(".jpg", pixels)
+    assert ok
+    exif = b"Exif\0\0II" + struct.pack("<HIHHHIHHI", 42, 8, 1, 0x0112, 3, 1, 6, 0, 0)
+    raw = jpeg.tobytes()
+    oriented = raw[:2] + b"\xff\xe1" + struct.pack(">H", len(exif) + 2) + exif + raw[2:]
+
+    class OrientationDetector:
+        def detect(self, image, crop):
+            assert crop == (0, 0, 40, 80)
+            assert image[10, 30, 2] > 240
+            assert image[10, 10, 2] < 10
+            return []
+
+    assert analyze_image(oriented, OrientationDetector())["image_size"] == [40, 80]
 
 
 def test_analyze_endpoint_filters_and_projects(screenshot):

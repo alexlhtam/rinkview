@@ -11,7 +11,7 @@ from rinkview_cv.teams import classify_image, jersey_features
 def analyze_image(raw: bytes, detector: Detector, calibration: Calibration | None = None):
     if not raw:
         raise ValueError("could not decode screenshot")
-    image = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+    image = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if image is None:
         raise ValueError("could not decode screenshot")
     height, width = image.shape[:2]
