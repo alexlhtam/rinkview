@@ -1,6 +1,6 @@
 """Stitch compatible track fragments, filter their motion, and export at 10 Hz."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil, floor
 
 import numpy as np
@@ -22,7 +22,27 @@ class Observation:
     jersey: Jersey | None
 
 
-def stitch(tracks, labels, fps):
+def split_team_switches(tracks, frames, labels, switches):
+    split_ids = set()
+    if not switches:
+        return split_ids
+    next_id = max(tracks) + 1
+    for track_id, (index, before, after) in sorted(switches.items()):
+        tail = []
+        for obs in tracks[track_id][index:]:
+            tracked = replace(obs.tracked, track_id=next_id)
+            tail.append(replace(obs, tracked=tracked))
+            frames[obs.frame] = [tracked if item.track_id == track_id else item for item in frames[obs.frame]]
+        tracks[track_id] = tracks[track_id][:index]
+        tracks[next_id] = tail
+        labels[track_id] = Assignment("player", before)
+        labels[next_id] = Assignment("player", after)
+        split_ids.update((track_id, next_id))
+        next_id += 1
+    return split_ids
+
+
+def stitch(tracks, labels, fps, *, keep_ids=()):
     aliases = {track_id: track_id for track_id in tracks}
     combined = {}
     active = []
@@ -58,9 +78,11 @@ def stitch(tracks, labels, fps):
         else:
             combined[track_id] = list(track)
             active.append(track_id)
+    keep_roots = {aliases[track_id] for track_id in keep_ids}
     return {
         track_id: observations for track_id, observations in combined.items()
-        if sum(min(1 / fps, b.t - a.t) for a, b in zip(observations, observations[1:])) + 1 / fps >= 1 - .01
+        if track_id in keep_roots
+        or sum(min(1 / fps, b.t - a.t) for a, b in zip(observations, observations[1:])) + 1 / fps >= 1 - .01
     }, aliases
 
 

@@ -1,5 +1,6 @@
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,7 +21,7 @@ from rinkview_cv.process import process_video
 from rinkview_cv.project.ice import Calibration, IceDetection, IceFilter, clamp_to_rink
 from rinkview_cv.teams import Assignment, classify, jersey_features
 from rinkview_cv.track import Tracked, Tracker
-from rinkview_cv.track.positions import Observation, resample, stitch
+from rinkview_cv.track.positions import Observation, resample, split_team_switches, stitch
 
 SHARED = Path(__file__).resolve().parents[2] / "shared"
 
@@ -146,13 +147,33 @@ def test_classification_and_explicit_roles(rink):
         3: observations(0, 10, 3, pale, x0=rink.goal_x, role="goalie"),
         4: observations(0, 10, 4, navy, role="referee"),
     }
-    assigned, side = classify(tracks, rink)
+    assigned, side, _ = classify(tracks, rink)
     assert assigned == {
-        1: Assignment("player", "A"), 2: Assignment("player", "B"),
-        3: Assignment("goalie", "B"), 4: Assignment("referee", "none"),
+        1: Assignment("player", "B"), 2: Assignment("player", "A"),
+        3: Assignment("goalie", "A"), 4: Assignment("referee", "none"),
     }
-    assert side == -1
-    assert classify(tracks, rink, a_defends=1)[0][3] == Assignment("goalie", "A")
+    assert side == 1
+    assert classify(tracks, rink, a_defends=-1)[0][3] == Assignment("goalie", "B")
+    assert classify(tracks, rink, team_a_jersey="dark")[0][1] == Assignment("player", "A")
+
+
+def test_agreeing_goalie_votes_take_priority_over_outlier_crops(rink):
+    def jersey_track(track_id, lightness, x=0, role="player"):
+        track = observations(0, len(lightness), track_id, (155, 60, 30), x0=x, role=role)
+        return [replace(o, jersey=replace(o.jersey, colours=np.array([value])))
+                for o, value in zip(track, lightness)]
+
+    tracks = {
+        1: jersey_track(1, [0.] * 10),
+        2: jersey_track(2, [1.] * 10),
+        3: jersey_track(3, [.49] * 3 + [1.], -rink.goal_x, "goalie"),
+        4: jersey_track(4, [.51] * 3 + [0.], rink.goal_x, "goalie"),
+    }
+    labels, side, _ = classify(tracks, rink)
+    assert side == 1
+    assert labels[3] == Assignment("goalie", "B")
+    assert labels[4] == Assignment("goalie", "A")
+    assert classify(tracks, rink, a_defends=-1)[1] == -1
 
 
 def test_team_fit_ignores_outlier_jerseys_at_the_boards_when_possible(rink):
@@ -162,7 +183,7 @@ def test_team_fit_ignores_outlier_jerseys_at_the_boards_when_possible(rink):
     }
     for track_id in range(3, 9):
         tracks[track_id] = observations(0, 10, track_id, (50, 180, 85), y0=-11)
-    labels, _ = classify(tracks, rink)
+    labels, _, _ = classify(tracks, rink)
     assert {labels[1].team, labels[2].team} == {"A", "B"}
 
 
@@ -172,9 +193,126 @@ def test_goalie_heuristic_only_relabels_generic_people(rink):
         1: observations(0, 12, 1, pale, x0=-rink.goal_x, role="player"),
         2: observations(0, 12, 2, pale, x0=rink.goal_x, role="person"),
     }
-    assigned, _ = classify(tracks, rink)
+    assigned, _, _ = classify(tracks, rink)
     assert assigned[1].role == "player"
     assert assigned[2].role == "goalie"
+
+
+def test_crease_occupancy_takes_priority_over_plain_official_cue(rink):
+    dark = (74, 74, 74)
+    tracks = {
+        1: observations(0, 12, 1, dark, x0=-rink.goal_x, role="person"),
+        2: observations(0, 12, 2, dark, role="person"),
+    }
+    assigned, _, _ = classify(tracks, rink)
+    assert assigned[1].role == "goalie"
+    assert assigned[2] == Assignment("referee", "none")
+
+
+def test_jersey_features_detect_stripes_and_plain_official_kits():
+    box = (0, 0, 36, 80)
+    dark = np.full((80, 36, 3), 74, np.uint8)
+    colour_block = dark.copy()
+    colour_block[16:28] = 215
+    colour_block[44:] = 176
+    striped = dark.copy()
+    striped[:, ::4] = 190
+    striped[:, 1::4] = 190
+    skater = dark.copy()
+    skater[16:33] = (190, 145, 50)
+    skater[53:] = 224
+
+    assert jersey_features(dark, box).plain_official
+    assert jersey_features(colour_block, box).plain_official
+    assert jersey_features(striped, box).stripes
+    assert not jersey_features(dark, box).stripes
+    assert not jersey_features(skater, box).plain_official
+    assert not jersey_features(skater, box).stripes
+
+
+def test_plain_official_requires_track_consensus_and_on_ice_motion(rink):
+    dark, pale, blue = (74, 74, 74), (245, 245, 245), (155, 60, 30)
+    moving = observations(0, 12, 1, dark, role="person")
+    pale_jersey = observations(0, 1, 2, pale)[0].jersey
+    static = [replace(o, tracked=replace(o.tracked, ice=replace(o.tracked.ice, point=(0, 0))))
+              for o in observations(0, 12, 3, dark, role="person")]
+    off_ice = [replace(o, tracked=replace(o.tracked, ice=replace(o.tracked.ice, on_ice=False)))
+               for o in observations(0, 12, 4, dark, role="person")]
+    mixed = observations(0, 12, 2, dark, role="person")
+    tracks = {
+        1: [replace(o, jersey=pale_jersey) if i in (1, 4, 8) else o for i, o in enumerate(moving)],
+        2: [replace(o, jersey=pale_jersey) if i % 2 else o for i, o in enumerate(mixed)],
+        3: static,
+        4: off_ice,
+        5: observations(0, 12, 5, dark),
+        6: observations(0, 12, 6, pale),
+        7: observations(0, 12, 7, blue),
+        8: observations(0, 12, 8, dark, role="person", step=.1),
+    }
+    assigned, _, _ = classify(tracks, rink)
+    assert assigned[1] == Assignment("referee", "none")
+    assert all(assigned[i].role == "player" for i in range(2, 9))
+    game_labels, _, _ = classify({i: tracks[i] for i in (1, 6, 7)}, rink)
+    assert {game_labels[6].team, game_labels[7].team} == {"A", "B"}
+
+
+def test_team_vote_uses_the_whole_track_and_is_independent_of_track_order(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 20, 1, navy),
+        2: observations(0, 20, 2, pale),
+        3: observations(0, 5, 3, navy) + observations(1, 12, 3, pale),
+    }
+    labels, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert labels[3] == Assignment("player", "A")
+    assert switches == {}
+    assert classify(dict(reversed(list(tracks.items()))), rink, switch_gap=.4)[0] == labels
+
+
+def test_sustained_opposite_kit_after_a_gap_splits_the_debug_and_export_tracks(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 15, 1, navy),
+        2: observations(0, 15, 2, pale),
+        3: observations(0, 8, 3, navy) + observations(2, 8, 3, pale),
+    }
+    frames = {o.frame: [o.tracked] for o in tracks[3]}
+    labels, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert switches == {3: (8, "B", "A")}
+    split_team_switches(tracks, frames, labels, switches)
+    assert labels[3] == Assignment("player", "B")
+    assert labels[4] == Assignment("player", "A")
+    assert [o.tracked.track_id for o in tracks[3]] == [3] * 8
+    assert [o.tracked.track_id for o in tracks[4]] == [4] * 8
+    assert all(frames[o.frame] == [o.tracked] for o in tracks[3] + tracks[4])
+
+
+@pytest.mark.parametrize(("start", "expected_switch"), [(1.79999, True), (1.7998, False)])
+def test_team_switch_gap_tolerates_timestamp_rounding(rink, start, expected_switch):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 15, 1, navy),
+        2: observations(0, 15, 2, pale),
+        3: observations(0, 8, 3, navy) + observations(start, 8, 3, pale),
+    }
+    _, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert switches == ({3: (8, "B", "A")} if expected_switch else {})
+
+
+def test_stitch_preserves_sparse_team_switch_fragments(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 40, 1, navy, step=.1),
+        2: observations(0, 40, 2, pale, step=.1),
+        3: observations(0, 5, 3, navy, step=.3) + observations(2, 5, 3, pale, step=.3),
+    }
+    frames = {o.frame: [o.tracked] for o in tracks[3]}
+    labels, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert switches == {3: (5, "B", "A")}
+    split_ids = split_team_switches(tracks, frames, labels, switches)
+    cleaned, _ = stitch(tracks, labels, 10, keep_ids=split_ids)
+    assert cleaned[3] == tracks[3]
+    assert cleaned[4] == tracks[4]
 
 
 def test_stitch_filter_and_resample_without_extrapolation(rink):
@@ -239,7 +377,7 @@ def test_process_with_synthetic_detector_and_video(tmp_path):
             ]
 
     out = tmp_path / "out"
-    status = process_video(video, calib, out, FakeDetector(), 5, -1)
+    status = process_video(video, calib, out, FakeDetector(), 5, -1, team_a_jersey="dark")
     assert "20/30 detections kept" in status
     rows = json.loads((out / "positions.json").read_text())
     summary = json.loads((out / "summary.json").read_text())

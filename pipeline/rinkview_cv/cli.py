@@ -70,6 +70,8 @@ def main() -> None:
     process.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     process.add_argument("--fps", type=float, default=10, help="detection sample rate (default: 10)")
     process.add_argument("--weights", default="yolo11s.pt", help="Ultralytics detection weights (default: yolo11s.pt)")
+    process.add_argument("--team-a-jersey", choices=("light", "dark"), default="light",
+                         help="choose which jersey cluster is Team A (default: light)")
     process.add_argument("--team-a-defends", choices=("left", "right"), help="override Team A's defending end")
     args = parser.parse_args()
     try:
@@ -89,6 +91,7 @@ def main() -> None:
             a_defends = {"left": -1, "right": 1}.get(args.team_a_defends)
             print(process_video(
                 args.video, args.calib, args.out, YoloDetector(args.device, args.weights), args.fps, a_defends,
+                team_a_jersey=args.team_a_jersey,
             ))
     except (OSError, KeyError, ValueError, TypeError, cv2.error) as exc:
         parser.exit(2, f"rinkview: {exc}\n")
