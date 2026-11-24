@@ -146,7 +146,7 @@ def _clear_team_switch(observations, distances, weights, gap):
     support = np.r_[0., np.cumsum(weights)]
     counts = np.r_[0, np.cumsum(strong & (weights > 0))]
     best = None
-    for i in np.flatnonzero(np.diff(times) >= gap) + 1:
+    for i in np.flatnonzero(np.diff(times) >= gap - 1e-4) + 1:
         if times[i - 1] - times[0] < 1 or times[-1] - times[i] < 1:
             continue
         if counts[i] < 5 or counts[-1] - counts[i] < 5:

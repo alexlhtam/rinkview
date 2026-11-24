@@ -287,6 +287,18 @@ def test_sustained_opposite_kit_after_a_gap_splits_the_debug_and_export_tracks(r
     assert all(frames[o.frame] == [o.tracked] for o in tracks[3] + tracks[4])
 
 
+@pytest.mark.parametrize(("start", "expected_switch"), [(1.79999, True), (1.7998, False)])
+def test_team_switch_gap_tolerates_timestamp_rounding(rink, start, expected_switch):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 15, 1, navy),
+        2: observations(0, 15, 2, pale),
+        3: observations(0, 8, 3, navy) + observations(start, 8, 3, pale),
+    }
+    _, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert switches == ({3: (8, "B", "A")} if expected_switch else {})
+
+
 def test_stitch_preserves_sparse_team_switch_fragments(rink):
     navy, pale = (155, 60, 30), (245, 245, 245)
     tracks = {
