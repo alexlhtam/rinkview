@@ -63,7 +63,8 @@ def test_yolo_adapter_preserves_custom_roles_and_full_frame_coordinates(monkeypa
     ]
 
 
-def test_tile_dedup_keeps_overlapping_different_classes():
+@pytest.mark.parametrize("same_tile", [True, False], ids=["within-tile", "across-tiles"])
+def test_tile_dedup_uses_class_only_within_a_tile(same_tile):
     def result(boxes):
         data = SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: np.array(boxes)))
         return SimpleNamespace(boxes=SimpleNamespace(data=data))
@@ -71,14 +72,16 @@ def test_tile_dedup_keeps_overlapping_different_classes():
     detector = YoloDetector.__new__(YoloDetector)
     detector.device = "cpu"
     detector.roles = {0: "player", 1: "goalie"}
-    detector.model = SimpleNamespace(predict=lambda *_args, **_kwargs: [
-        result([[1200, 20, 1240, 80, .9, 0]]),
-        result([[136, 20, 176, 80, .8, 0], [136, 20, 176, 80, .7, 1]]),
-    ])
-    assert detector.detect(np.zeros((160, 2600, 3), np.uint8), (0, 0, 2600, 160)) == [
-        Detection((1200, 20, 1240, 80), .9, "player"),
-        Detection((1200, 20, 1240, 80), .7, "goalie"),
-    ]
+    first = [[1200, 20, 1240, 80, .9, 0], [1200, 20, 1240, 80, .8, 0]]
+    second = [[136, 20, 176, 80, .6, 0]]
+    expected = [Detection((1200, 20, 1240, 80), .9, "player")]
+    if same_tile:
+        first.append([1200, 20, 1240, 80, .7, 1])
+        expected.append(Detection((1200, 20, 1240, 80), .7, "goalie"))
+    else:
+        second.append([136, 20, 176, 80, .7, 1])
+    detector.model = SimpleNamespace(predict=lambda *_args, **_kwargs: [result(first), result(second)])
+    assert detector.detect(np.zeros((160, 2600, 3), np.uint8), (0, 0, 2600, 160)) == expected
 
 
 def test_ice_mask_board_fallback_and_rounded_corner(rink):
