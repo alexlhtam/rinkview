@@ -1,5 +1,8 @@
 import { ghostKey, interpolate } from './clip'
-import type { Ghost, Point, PositionSample, Role, TeachingClip, Team } from './types'
+import type { Ghost, Keyframe, Point, PositionSample, Role, TeachingClip, Team } from './types'
+
+const unlinkedGhostKeys = new WeakMap<Ghost, string>()
+let nextGhostKey = 0
 
 export interface Player {
   key: string
@@ -36,13 +39,23 @@ export function boardPlayers(frame: readonly PositionSample[], clip: TeachingCli
   ]
 }
 
-export function ghostMarkerKey(ghost: Ghost, index: number) {
-  return ghostKey(ghost) ?? `unlinked:${index}`
+export function ghostMarkerKey(ghost: Ghost) {
+  const existing = ghostKey(ghost) ?? unlinkedGhostKeys.get(ghost)
+  if (existing) return existing
+  const key = `unlinked:${nextGhostKey++}`
+  unlinkedGhostKeys.set(ghost, key)
+  return key
+}
+
+export function withGhostKeyframes(ghost: Ghost, keyframes: Keyframe[]): Ghost {
+  const updated = { ...ghost, keyframes }
+  if (!ghostKey(ghost)) unlinkedGhostKeys.set(updated, ghostMarkerKey(ghost))
+  return updated
 }
 
 export function ghostMarkers(clip: TeachingClip, players: Player[], time: number): GhostMarker[] {
-  return clip.ghosts_json.flatMap((ghost, index) => {
-    const key = ghostMarkerKey(ghost, index)
+  return clip.ghosts_json.flatMap(ghost => {
+    const key = ghostMarkerKey(ghost)
     const source = players.find(player => player.key === key)
     const point = interpolate(ghost.keyframes, time)
     if (!point || source?.hidden || (ghost.track_id !== null && clip.hidden_track_ids.includes(ghost.track_id))) return []

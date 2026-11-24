@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { exampleClip } from '../demo/example'
 import { createClip, interpolate, parseClip, serializeClip, setKeyframe } from './clip'
 import { historyOf, push, redo, undo } from './history'
-import { boardPlayers, ghostMarkerKey, ghostMarkers } from './players'
+import { boardPlayers, ghostMarkerKey, ghostMarkers, withGhostKeyframes } from './players'
 import type { PositionSample } from './types'
 
 describe('Teaching Clip JSON', () => {
@@ -59,10 +59,27 @@ describe('Teaching Clip JSON', () => {
     ]
     const loaded = parseClip(serializeClip(clip))
     const markers = ghostMarkers(loaded, [], 0)
-    expect(markers.map(marker => marker.key)).toEqual(['unlinked:0', 'unlinked:1', 'track:10'])
+    expect(new Set(markers.map(marker => marker.key)).size).toBe(3)
+    expect(markers[2].key).toBe('track:10')
     expect(markers.every(marker => marker.original === undefined)).toBe(true)
-    expect(loaded.ghosts_json.find((ghost, i) => ghostMarkerKey(ghost, i) === markers[1].key))
+    expect(loaded.ghosts_json.find(ghost => ghostMarkerKey(ghost) === markers[1].key))
       .toBe(loaded.ghosts_json[1])
+  })
+
+  it('keeps an unlinked ghost identity across keyframe edits and undoing deletion of an earlier ghost', () => {
+    const clip = createClip()
+    const keyframes = [{ t: 0, x_m: 2, y_m: 4 }]
+    const earlier = { track_id: null, team: 'A', keyframes } as const
+    const selected = { track_id: null, team: 'B', keyframes } as const
+    const key = ghostMarkerKey(selected)
+    const moved = withGhostKeyframes(selected, [{ t: 0, x_m: 4, y_m: 6 }])
+    clip.ghosts_json = [earlier, selected]
+    const before = historyOf(clip)
+    const after = push(before, { ...clip, ghosts_json: [moved] })
+    expect(ghostMarkers(after.current, [], 0)[0].key).toBe(key)
+    expect(ghostMarkers(undo(after).current, [], 0).map(marker => marker.key))
+      .toEqual([ghostMarkerKey(earlier), key])
+    expect(parseClip(serializeClip(after.current))).toEqual(after.current)
   })
 })
 
