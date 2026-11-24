@@ -8,7 +8,7 @@ export default ts.config(
   js.configs.recommended,
   ...ts.configs.recommended,
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['{src,demo}/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': hooks },
     rules: hooks.configs['recommended-latest'].rules,

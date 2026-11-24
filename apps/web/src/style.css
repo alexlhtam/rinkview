@@ -89,6 +89,9 @@ h1 { margin-block: 3px 2px; font-size: clamp(32px, 3.1vw, 46px); font-weight: 82
 .timeline-ticks { color: var(--muted); font: 10px var(--mono); margin-bottom: 8px; }
 .control-row, .controls { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .control-row { justify-content: space-between; gap: 9px; }
+.teaching-actions { margin-top: 10px; }
+.teaching-actions [role="alert"] { color: #ffb5c2; }
+.teaching-panel > .panel-head { margin-bottom: 10px; }
 .play-button, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .play-button { min-width: 84px; }
 .icon-button { padding-inline: 7px; }

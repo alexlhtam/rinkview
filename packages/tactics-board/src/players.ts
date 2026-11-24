@@ -66,5 +66,7 @@ export function ghostMarkers(clip: TeachingClip, players: Player[], time: number
   })
 }
 
-export const teamColor = (team: Team, role?: Role) =>
-  role === 'referee' || team === 'none' ? '#505d72' : team === 'A' ? '#174fc8' : '#bc3251'
+const defaultColors = { none: '#505d72', A: '#174fc8', B: '#bc3251' }
+
+export const teamColor = (team: Team, role?: Role, colors: Readonly<Record<Team, string>> = defaultColors) =>
+  colors[role === 'referee' ? 'none' : team]

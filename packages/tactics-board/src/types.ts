@@ -89,4 +89,6 @@ export interface TacticsBoardProps {
   initialPlayers?: readonly PositionSample[]
   initialClip?: TeachingClip
   onChange?: (clip: TeachingClip) => void
+  onOpenClip?: (clip: TeachingClip) => Promise<void>
+  teamColors?: Readonly<Record<Team, string>>
 }

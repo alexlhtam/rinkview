@@ -86,7 +86,14 @@ export function usePlayback() {
     }
   }
 
-  return { videoRef, time, duration, playing, speed, error, seek, step, changeSpeed, toggle };
+  function pauseAtDisplayedFrame() {
+    const video = videoRef.current;
+    if (!video) return time;
+    video.pause();
+    return lastFrame.current ?? video.currentTime;
+  }
+
+  return { videoRef, time, duration, playing, speed, error, seek, step, changeSpeed, toggle, pauseAtDisplayedFrame };
 }
 
 export function usePositionWindow(source: PositionSource, time: number) {

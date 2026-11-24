@@ -22,7 +22,7 @@ type Movable = Player | GhostMarker
 type Drag = { tool: 'move' | 'ghost'; player: Movable; start: Point; point: Point }
 type Draft = Stroke | Drag
 
-export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange }: TacticsBoardProps) {
+export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onOpenClip, teamColors }: TacticsBoardProps) {
   const [history, setHistory] = useState(() =>
     historyOf(initialClip ?? createClip(initialPlayers[0]?.t ?? 0)))
   const clip = history.current
@@ -340,6 +340,10 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   async function loadClip(file: File) {
     try {
       const loaded = parseClip(await file.text())
+      if (onOpenClip) {
+        await onOpenClip(loaded)
+        return
+      }
       clearDraft()
       seek(loaded.start_t)
       setSelected(null)
@@ -448,7 +452,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <span>{rinkTemplate.length_m} × {rinkTemplate.width_m} m</span>
         </div>
         <div className="rvb-ice">
-          <BoardSurface template={rinkTemplate} players={displayPlayers}
+          <BoardSurface template={rinkTemplate} players={displayPlayers} teamColors={teamColors}
             ghosts={temporaryGhost ? [...displayGhosts.filter(g => g.key !== temporaryGhost.key), temporaryGhost] : displayGhosts}
             annotations={preview ? [...displayAnnotations, preview] : displayAnnotations}
             selected={selected} presentation={presenting} surfaceRef={surface} rinkRef={rink}
@@ -520,8 +524,9 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <div className="rvb-bounds">
             {(['start_t', 'end_t'] as const).map(bound => <label key={bound}>{bound === 'start_t' ? 'Start (s)' : 'End (s)'}
               <input type="number" min="0" step="any" key={clip[bound]} defaultValue={clip[bound]}
+                readOnly={Boolean(onOpenClip) && bound === 'start_t'}
                 onBlur={event => {
-                  if (!changeRange(bound, event.target.valueAsNumber)) event.target.value = String(clip[bound])
+                  if (!event.target.readOnly && !changeRange(bound, event.target.valueAsNumber)) event.target.value = String(clip[bound])
                 }} />
             </label>)}
           </div>
@@ -541,7 +546,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
         </div>
         {selectedMarker && <div className="rvb-inspector-block">
           <h2><span className="rvb-team-dot" style={{
-            background: teamColor(selectedMarker.team, selectedPlayer?.role),
+            background: teamColor(selectedMarker.team, selectedPlayer?.role, teamColors),
           }} />{selectedPlayer ? `Player ${selectedPlayer.caption}` : 'Ghost player'}</h2>
           {selectedPlayer && initialPlayers.find(p => p.track_id === selectedPlayer.trackId)?.on_ice !== false &&
             <button onClick={() => toggleHidden(selectedPlayer)}>{selectedPlayer.hidden ? 'Show player' : 'Hide player'}</button>}
