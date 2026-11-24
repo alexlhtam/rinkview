@@ -1,5 +1,6 @@
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -175,6 +176,53 @@ def test_goalie_heuristic_only_relabels_generic_people(rink):
     assigned, _ = classify(tracks, rink)
     assert assigned[1].role == "player"
     assert assigned[2].role == "goalie"
+
+
+def test_jersey_features_detect_stripes_and_plain_official_kits():
+    box = (0, 0, 36, 80)
+    dark = np.full((80, 36, 3), 74, np.uint8)
+    colour_block = dark.copy()
+    colour_block[16:28] = 215
+    colour_block[44:] = 176
+    striped = dark.copy()
+    striped[:, ::4] = 190
+    striped[:, 1::4] = 190
+    skater = dark.copy()
+    skater[16:33] = (190, 145, 50)
+    skater[53:] = 224
+
+    assert jersey_features(dark, box).plain_official
+    assert jersey_features(colour_block, box).plain_official
+    assert jersey_features(striped, box).stripes
+    assert not jersey_features(dark, box).stripes
+    assert not jersey_features(skater, box).plain_official
+    assert not jersey_features(skater, box).stripes
+
+
+def test_plain_official_requires_track_consensus_and_on_ice_motion(rink):
+    dark, pale, blue = (74, 74, 74), (245, 245, 245), (155, 60, 30)
+    moving = observations(0, 12, 1, dark, role="person")
+    pale_jersey = observations(0, 1, 2, pale)[0].jersey
+    static = [replace(o, tracked=replace(o.tracked, ice=replace(o.tracked.ice, point=(0, 0))))
+              for o in observations(0, 12, 3, dark, role="person")]
+    off_ice = [replace(o, tracked=replace(o.tracked, ice=replace(o.tracked.ice, on_ice=False)))
+               for o in observations(0, 12, 4, dark, role="person")]
+    mixed = observations(0, 12, 2, dark, role="person")
+    tracks = {
+        1: [replace(o, jersey=pale_jersey) if i in (1, 4, 8) else o for i, o in enumerate(moving)],
+        2: [replace(o, jersey=pale_jersey) if i % 2 else o for i, o in enumerate(mixed)],
+        3: static,
+        4: off_ice,
+        5: observations(0, 12, 5, dark),
+        6: observations(0, 12, 6, pale),
+        7: observations(0, 12, 7, blue),
+        8: observations(0, 12, 8, dark, role="person", step=.1),
+    }
+    assigned, _ = classify(tracks, rink)
+    assert assigned[1] == Assignment("referee", "none")
+    assert all(assigned[i].role == "player" for i in range(2, 9))
+    game_labels, _ = classify({i: tracks[i] for i in (1, 6, 7)}, rink)
+    assert {game_labels[6].team, game_labels[7].team} == {"A", "B"}
 
 
 def test_stitch_filter_and_resample_without_extrapolation(rink):

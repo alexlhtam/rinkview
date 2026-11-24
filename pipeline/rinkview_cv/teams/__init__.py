@@ -11,6 +11,7 @@ import numpy as np
 class Jersey:
     colours: np.ndarray
     stripes: bool
+    plain_official: bool
 
 
 def jersey_features(image, box):
@@ -23,7 +24,8 @@ def jersey_features(image, box):
     if right - left < 4 or bottom - top < 4:
         return None
     torso = image[top:bottom, left:right]
-    hue, saturation, value = cv2.cvtColor(torso, cv2.COLOR_BGR2HSV).reshape(-1, 3).T
+    hsv = cv2.cvtColor(torso, cv2.COLOR_BGR2HSV)
+    hue, saturation, value = hsv.reshape(-1, 3).T
     chromatic = (saturation >= 60) & (value >= 55)
     ice_white = (saturation < 48) & (value >= 185)
     hue_hist = np.bincount(hue[chromatic] // 15, minlength=12) / len(hue)
@@ -35,7 +37,50 @@ def jersey_features(image, box):
     dark, light = columns < 85, columns > 145
     edges = int(np.count_nonzero(np.diff(dark.astype(int))))
     stripes = chromatic.mean() < .18 and dark.mean() >= .21 and light.mean() >= .21 and edges >= 5
-    return Jersey(colours, bool(stripes))
+    return Jersey(colours, bool(stripes), _plain_kit(image, box))
+
+
+def _plain_kit(image, box):
+    x1, y1, x2, y2 = box
+    width, height = x2 - x1, y2 - y1
+    if width > 1.08 * height:
+        return False
+    left = max(0, int(x1 + .33 * width))
+    right = min(image.shape[1], int(x2 - .33 * width))
+    top = max(0, int(y1))
+    bottom = min(image.shape[0], int(y2))
+    if right - left < 4 or bottom - top < 20:
+        return False
+    kit = cv2.cvtColor(image[top:bottom, left:right], cv2.COLOR_BGR2HSV)
+    hue, sat, value = np.moveaxis(kit, -1, 0)
+    n = len(kit)
+
+    def band(rows, start, stop):
+        return rows[int(start * n):int(stop * n)]
+
+    cool = band((hue >= 75) & (hue < 160) & (sat >= 55), .2, .85)
+    if cool.mean() > .12:
+        return False
+    profile = np.median(value, axis=1)
+    if width <= .85 * height and (band(profile, .2, .85) < 128).mean() >= .77:
+        return True
+    shoulders = np.quantile(band(profile, .175, .375), .75)
+    chest = np.quantile(band(profile, .325, .50), .25)
+    trousers = np.median(band(profile, .575, .75))
+    return bool(
+        shoulders >= 150 and chest <= 110 and min(shoulders, trousers) - chest >= 40
+        or shoulders >= 170 and chest <= 68 and np.median(band(profile, .65, .80)) >= 115
+    )
+
+
+def _looks_like_plain_official(observations):
+    samples = [o for o in observations if o.jersey is not None and o.tracked.ice.on_ice]
+    if len(samples) < 5 or samples[-1].t - samples[0].t < 1.5:
+        return False
+    if sum(o.jersey.plain_official for o in samples) < .65 * len(samples):
+        return False
+    low, high = np.quantile([o.tracked.ice.point for o in samples], [.1, .9], axis=0)
+    return np.linalg.norm(high - low) >= 1.25
 
 
 def two_means(features):
@@ -72,6 +117,9 @@ def classify(tracks, rink, a_defends=None):
         votes.pop("person", None)
         generic = not votes
         roles[track_id] = "player" if generic else votes.most_common(1)[0][0]
+        if generic and _looks_like_plain_official(observations):
+            roles[track_id] = "referee"
+            continue
         confident = sorted(
             (o for o in observations if o.jersey is not None),
             key=lambda o: -o.tracked.ice.detection.conf,
@@ -107,8 +155,8 @@ def classify(tracks, rink, a_defends=None):
     centres = two_means([feature for i, feature in centre_jerseys.items() if roles[i] == "player"])
     if centres is None:
         centres = two_means([
-            np.mean([j.colours for j in jerseys[i]], axis=0)
-            for i, role in roles.items() if role == "player" and jerseys[i]
+            np.mean([j.colours for j in crops], axis=0)
+            for i, crops in jerseys.items() if roles[i] == "player" and crops
         ])
 
     def vote(track_id):

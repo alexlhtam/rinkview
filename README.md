@@ -91,8 +91,11 @@ Team A and B are per-clip jersey-colour clusters, not guaranteed consistent
 across periods. The pipeline guesses their defending ends from goalie crops
 and defaults to the left for A if uncertain; use `--team-a-defends left` or
 `right` if the zone directions are wrong. With COCO weights, goalie and referee
-roles are heuristics. Expect missed and merged boxes during occlusions,
-fragmented IDs, and occasional wrong team colours or off-ice detections.
+roles are heuristics. The referee heuristic uses repeated clothing cues across a
+track, including some plain or colour-blocked kits; it can miss officials or
+confuse them with skaters wearing similar colours. Expect missed and merged
+boxes during occlusions, fragmented IDs, and occasional wrong team colours or
+off-ice detections.
 The first decoded frame is the drift reference; it does not verify that the
 camera was already in the calibrated position when recording started.
 

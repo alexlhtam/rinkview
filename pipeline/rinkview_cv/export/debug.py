@@ -10,6 +10,8 @@ import numpy as np
 from rinkview_cv.track.positions import HZ
 
 TEAM = {"A": (255, 160, 45), "B": (35, 120, 255), "none": (180, 180, 180)}
+REFEREE_BOX = (235, 235, 235)
+REFEREE_DOT = (128, 128, 128)
 
 
 def render_debug(video, path, rink, frames, labels, aliases, rows):
@@ -35,20 +37,23 @@ def render_debug(video, path, rink, frames, labels, aliases, rows):
                 ice = tracked.ice
                 track_id = aliases[tracked.track_id]
                 label = labels[track_id]
-                color = TEAM[label.team]
+                referee = label.role == "referee"
+                color = REFEREE_BOX if referee else TEAM[label.team]
                 x1, y1, x2, y2 = (round(v * scale) for v in ice.detection.xyxy)
                 cv2.rectangle(image, (x1, y1), (x2, y2), color, 2, cv2.LINE_AA)
                 foot = tuple(round(v * scale) for v in ice.foot)
                 cv2.circle(image, foot, 4 if ice.estimated else 2, color, 1 if ice.estimated else -1, cv2.LINE_AA)
-                suffix = {"goalie": " G", "referee": " R"}.get(label.role, "")
-                _text(image, f"{label.team} {track_id}{suffix}", (x1, max(12, y1 - 4)), color, .45)
+                suffix = " G" if label.role == "goalie" else ""
+                caption = f"REF {track_id}" if referee else f"{label.team} {track_id}{suffix}"
+                _text(image, caption, (x1, max(12, y1 - 4)), color, .45)
             inset = canvas.copy()
             for row in by_tick.get(round(frame.t * HZ), ()):
                 if row["on_ice"]:
                     pt = to_pixel((row["x_m"], row["y_m"]))
                     radius = 6 if row["role"] == "goalie" else 5
                     cv2.circle(inset, pt, radius + 1, (12, 25, 40), -1, cv2.LINE_AA)
-                    cv2.circle(inset, pt, radius, TEAM[row["team"]], -1, cv2.LINE_AA)
+                    color = REFEREE_DOT if row["role"] == "referee" else TEAM[row["team"]]
+                    cv2.circle(inset, pt, radius, color, -1, cv2.LINE_AA)
             image[12:12 + map_h, w - map_w - 12:w - 12] = inset
             _text(image, f"RINKVIEW  |  {frame.t:05.2f} s", (18, 31), (248, 250, 252), .6)
             encoded = av.VideoFrame.from_ndarray(image, format="bgr24")
@@ -91,4 +96,7 @@ def minimap(rink, width):
         y = board.shape[0] - 9
         cv2.circle(board, (x, y - 3), 4, color, -1, cv2.LINE_AA)
         _text(board, f"Team {label}" if label != "none" else "Unassigned", (x + 9, y), (245, 245, 245), .36)
+    if width >= 290:
+        cv2.circle(board, (245, board.shape[0] - 12), 4, REFEREE_DOT, -1, cv2.LINE_AA)
+        _text(board, "Referee", (254, board.shape[0] - 9), (245, 245, 245), .36)
     return board, point
