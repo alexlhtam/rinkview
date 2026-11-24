@@ -56,7 +56,13 @@ function outputFile(folder: readonly File[], name: string) {
 }
 
 function resolveFolderTemplate(calibration: File, reference: string, folder: readonly File[]) {
-  const segments = filePath(calibration).split('/').slice(0, -1);
+  let path = calibration.webkitRelativePath ?? '';
+  if (!path) {
+    const matches = folder.filter(file => file.webkitRelativePath && file.name === calibration.name
+      && file.size === calibration.size && file.lastModified === calibration.lastModified);
+    if (matches.length === 1) path = matches[0].webkitRelativePath;
+  }
+  const segments = path.split('/').slice(0, -1);
   if (!segments.length || reference.startsWith('/') || /^[a-z]:/i.test(reference)) return;
   for (const segment of reference.split('/')) {
     if (!segment || segment === '.') continue;
