@@ -3,10 +3,15 @@ import type { PositionSource } from './data';
 import { MAX_TRAIL_SECONDS, WINDOW_SECONDS } from './samples';
 import type { Sample } from './samples';
 
+const FRAME_EPSILON = 1e-7;
+
+export function displayedFrameIndex(time: number, fps: number) {
+  return Math.floor(time * fps + FRAME_EPSILON);
+}
+
 export function fallbackFrameTarget(time: number, direction: -1 | 1, fps: number, duration: number) {
-  const tolerance = 1e-7;
-  const current = Math.floor(time * fps + tolerance);
-  const last = Math.max(0, Math.ceil(duration * fps - tolerance) - 1);
+  const current = displayedFrameIndex(time, fps);
+  const last = Math.max(0, Math.ceil(duration * fps - FRAME_EPSILON) - 1);
   const frame = Math.min(last, Math.max(0, current + direction));
   const start = frame / fps;
   return start + Math.min(0.25 / fps, (duration - start) / 2);

@@ -60,18 +60,21 @@ describe('teaching draft', () => {
     expect(confirmDiscard).not.toHaveBeenCalled();
   });
 
-  it('restores an edited imported clip when its start is within half a frame of the frozen timestamp', async () => {
-    const { clip } = await teachingFrame(game, 2.106, 5, new Map());
+  it('restores a late-in-frame imported draft only on the same displayed frame', async () => {
+    const fps = 60;
+    const frame = 126;
+    const { clip } = await teachingFrame(game, (frame + .9) / fps, 5, new Map());
     const imported = parseClip(serializeClip(clip));
     const draft = { clip: { ...imported, title: 'Defensive coverage' }, savedClip: imported };
-    const displayedFrame = await teachingFrame(game, 2.1, 5, new Map());
-    const nextFrame = await teachingFrame(game, 2.1 + 1 / 60, 5, new Map());
+    const displayedFrame = await teachingFrame(game, (frame - 1e-9) / fps, 5, new Map());
+    const nextFrame = await teachingFrame(game, (frame + 1) / fps, 5, new Map());
     const confirmDiscard = vi.fn(() => false);
 
-    expect(switchTeachingDraft(draft, displayedFrame.clip, false, 60, confirmDiscard)).toBe(draft);
+    expect(switchTeachingDraft(draft, displayedFrame.clip, false, fps, confirmDiscard)).toBe(draft);
     expect(confirmDiscard).not.toHaveBeenCalled();
-    expect(switchTeachingDraft(draft, nextFrame.clip, false, 60, confirmDiscard)).toBeNull();
+    expect(switchTeachingDraft(draft, nextFrame.clip, false, fps, confirmDiscard)).toBeNull();
     expect(confirmDiscard).toHaveBeenCalledOnce();
+    expect(switchTeachingDraft(draft, nextFrame.clip, false, fps, () => true)?.clip).toBe(nextFrame.clip);
   });
 
   it('keeps unsaved edits on cancel and switches to a different frame on confirmation', async () => {

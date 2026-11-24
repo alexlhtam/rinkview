@@ -2,6 +2,7 @@ import { createClip } from '@rinkview/tactics-board/source';
 import type { TeachingClip } from '@rinkview/tactics-board/source';
 import type { GameData } from './data';
 import type { Team } from './contracts';
+import { displayedFrameIndex } from './playback';
 import { SAMPLE_TOLERANCE, effectiveTeam, findSample } from './samples';
 
 export interface TeachingDraft {
@@ -16,7 +17,8 @@ export function canDiscardTeachingDraft(current: TeachingDraft | null, confirmDi
 export function switchTeachingDraft(
   current: TeachingDraft | null, nextClip: TeachingClip, loadingClip: boolean, fps: number, confirmDiscard: () => boolean,
 ): TeachingDraft | null {
-  if (!loadingClip && current && Math.abs(current.clip.start_t - nextClip.start_t) <= 0.5 / fps) return current;
+  if (!loadingClip && current
+    && displayedFrameIndex(current.clip.start_t, fps) === displayedFrameIndex(nextClip.start_t, fps)) return current;
   if (!canDiscardTeachingDraft(current, confirmDiscard)) return null;
   return { clip: nextClip, savedClip: nextClip };
 }
