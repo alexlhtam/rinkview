@@ -287,6 +287,22 @@ def test_sustained_opposite_kit_after_a_gap_splits_the_debug_and_export_tracks(r
     assert all(frames[o.frame] == [o.tracked] for o in tracks[3] + tracks[4])
 
 
+def test_stitch_preserves_sparse_team_switch_fragments(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 40, 1, navy, step=.1),
+        2: observations(0, 40, 2, pale, step=.1),
+        3: observations(0, 5, 3, navy, step=.3) + observations(2, 5, 3, pale, step=.3),
+    }
+    frames = {o.frame: [o.tracked] for o in tracks[3]}
+    labels, _, switches = classify(tracks, rink, switch_gap=.4)
+    assert switches == {3: (5, "B", "A")}
+    split_ids = split_team_switches(tracks, frames, labels, switches)
+    cleaned, _ = stitch(tracks, labels, 10, keep_ids=split_ids)
+    assert cleaned[3] == tracks[3]
+    assert cleaned[4] == tracks[4]
+
+
 def test_stitch_filter_and_resample_without_extrapolation(rink):
     navy, pale = (155, 60, 30), (245, 245, 245)
     tracks = {

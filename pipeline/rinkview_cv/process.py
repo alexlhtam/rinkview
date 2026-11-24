@@ -61,8 +61,8 @@ def process_video(
     labels, a_defends, switches = classify(
         tracks, calibration.rink, a_defends, team_a_jersey=team_a_jersey, switch_gap=max(.4, 1.5 / video.sample_fps),
     )
-    split_team_switches(tracks, frames, labels, switches)
-    cleaned, aliases = stitch(tracks, labels, video.sample_fps)
+    split_ids = split_team_switches(tracks, frames, labels, switches)
+    cleaned, aliases = stitch(tracks, labels, video.sample_fps, keep_ids=split_ids)
     source_times = np.asarray(video.times)
     rows = [
         row for track_id, observations in cleaned.items()
