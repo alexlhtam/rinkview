@@ -133,13 +133,23 @@ export function Screenshot({ active }: { active: boolean }) {
     }
   }
 
+  function changeRinkTemplate(id: string) {
+    if (id === template) return true;
+    if (board && !window.confirm('Discard the current Teaching Clip and change rink templates?')) return false;
+    setBoard(undefined);
+    savedBoard.current = undefined;
+    setBoardOpen(false);
+    setTemplate(id);
+    return true;
+  }
+
   function selectCalibration(next: ScreenshotCalibration) {
     if (!picture || !matching(next, picture.size)) throw new Error('Calibration does not match the image resolution.');
     const id = next.rink_template.split(/[\\/]/).at(-1)?.replace(/\.json$/, '');
     if (!id || !Object.hasOwn(templates, id)) throw new Error('This calibration must reference a bundled rink template.');
     rinkToImage([0, 0], next);
+    if (!changeRinkTemplate(id)) return;
     setCalibration(next);
-    setTemplate(id);
     setPairs(next.point_pairs ?? []);
     setLandmark('');
     setIceOutline(null);
@@ -274,12 +284,13 @@ export function Screenshot({ active }: { active: boolean }) {
               onChange={async event => {
                 const file = event.target.files?.[0];
                 if (!file) return;
+                event.target.value = '';
                 try { selectCalibration(readCalibration(JSON.parse(await file.text()))); }
                 catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid calibration.'); }
               }} /></label>
             <label>Rink template <select value={template} onChange={event => {
-              setTemplate(event.target.value); setCalibration(undefined); setPairs([]); setLandmark(''); setIceOutline(null);
-              setBoard(undefined);
+              if (!changeRinkTemplate(event.target.value)) return;
+              setCalibration(undefined); setPairs([]); setLandmark(''); setIceOutline(null);
             }}>{Object.keys(templates).map(id => <option key={id}>{id}</option>)}</select></label>
           </div>
           <div className="controls">
