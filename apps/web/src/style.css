@@ -76,8 +76,8 @@ h1 { margin-block: 3px 2px; font-size: clamp(32px, 3.1vw, 46px); font-weight: 82
 .time-readout { font: 11px var(--mono); color: var(--muted); }
 .time-readout strong { color: var(--accent); font-size: 12px; }
 .timeline-track { position: relative; margin-top: 1px; height: 29px; }
-.activity-bars { position: absolute; display: flex; gap: 2px; height: 23px; bottom: 5px; align-items: flex-end; opacity: .8; }
-.activity-bars i { flex: 1; min-width: 0; background: #354d6a; border-radius: 1px 1px 0 0; }
+.activity-bars { position: absolute; inset: auto 0 5px; height: 23px; opacity: .8; overflow: hidden; }
+.activity-bars i { position: absolute; bottom: 0; background: #354d6a padding-box; border-right: 2px solid transparent; border-radius: 1px 1px 0 0; }
 .timeline-progress { position: absolute; bottom: 4px; height: 2px; background: var(--accent); border-radius: 2px; }
 .clip-markers { position: absolute; inset: 0; pointer-events: none; }
 .clip-markers i { position: absolute; height: 4px; top: 0; background: #eeb365; }

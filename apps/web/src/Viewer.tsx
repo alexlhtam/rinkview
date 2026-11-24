@@ -9,6 +9,7 @@ import { useViewSettings } from './viewSettings';
 import { Insights } from './Insights';
 import { makeClip } from './clips';
 import type { Clip } from './clips';
+import { activityBars } from './timeline';
 
 const FILTERS = [
   { key: 'A', label: 'Team A' },
@@ -52,7 +53,7 @@ export function Viewer({ game }: { game: GameData }) {
   const hasUnassigned = game.tracks.some(p => p.role !== 'referee' && p.team === 'none') || [...overrides.values()].includes('none');
   const fps = game.fps ?? 30;
   const percent = (t: number) => duration ? Math.min(100, t * 100 / duration) : 0;
-  const maxDensity = Math.max(1, ...game.activity.bins);
+  const bars = useMemo(() => activityBars(game.activity, duration), [game.activity, duration]);
   const soloPeriod = game.summary.periods.length === 1 ? game.summary.periods[0].period : undefined;
 
   useEffect(() => {
@@ -122,9 +123,9 @@ export function Viewer({ game }: { game: GameData }) {
           <div className="timeline-label"><span className="micro">SHARED TIMELINE</span>
             <span className="time-readout"><strong>{stamp(time, true)}</strong> / {stamp(duration)}</span></div>
           <div className="timeline-track">
-            <div className="activity-bars" title="Relative movement intensity" aria-hidden="true"
-              style={{ left: `${percent(game.activity.start)}%`, width: `${percent(game.activity.end) - percent(game.activity.start)}%` }}>
-              {game.activity.bins.map((value, i) => <i key={i} style={{ height: `${value / maxDensity * 100}%` }} />)}
+            <div className="activity-bars" title="Relative movement intensity" aria-hidden="true">
+              {bars.map(({ left, width, height }, i) => <i key={i}
+                style={{ left: `${left}%`, width: `${width}%`, height: `${height}%` }} />)}
             </div>
             <div className="clip-markers" aria-hidden="true">{clips.map((clip, i) => <i key={i}
               title={clip.title} style={{ left: `${percent(clip.start_s)}%`, width: `${percent(clip.end_s) - percent(clip.start_s)}%` }} />)}</div>

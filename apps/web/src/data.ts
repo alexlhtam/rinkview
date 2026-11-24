@@ -2,6 +2,7 @@ import { isPositions, isRinkTemplate, isSummary } from './contracts';
 import type { Position, RinkTemplate, Summary } from './contracts';
 import { estimateFps, groupSamples, lowerBound } from './samples';
 import type { Sample } from './samples';
+import type { Activity } from './timeline';
 
 export interface PositionSource {
   readWindow(start: number, end: number): Promise<Sample[]>;
@@ -14,7 +15,7 @@ export interface GameData {
   summary: Summary;
   positions: PositionSource;
   tracks: Position[];
-  activity: { start: number; end: number; bins: number[] };
+  activity: Activity;
   fps?: number;
   dispose(): void;
 }
