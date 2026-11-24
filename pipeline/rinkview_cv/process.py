@@ -61,7 +61,9 @@ def process_video(
     source_times = np.asarray(video.times)
     rows = [
         row for track_id, observations in cleaned.items()
-        for row in resample(track_id, observations, labels[track_id], source_times, calibration.rink)
+        for row in resample(
+            track_id, observations, labels[track_id], source_times, calibration.rink, sample_fps=video.sample_fps,
+        )
     ]
     rows.sort(key=lambda row: (row["t"], row["track_id"]))
     out.mkdir(parents=True, exist_ok=True)

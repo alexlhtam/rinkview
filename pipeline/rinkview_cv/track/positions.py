@@ -93,8 +93,9 @@ def nearest_index(clock, t):
     return left if abs(clock[left] - t) <= abs(clock[right] - t) else right
 
 
-def resample(track_id: int, observations: list[Observation], label: Assignment, source_times, rink):
+def resample(track_id: int, observations: list[Observation], label: Assignment, source_times, rink, *, sample_fps):
     rows = []
+    observed_tolerance = .5 / max(HZ, sample_fps)
     splits = [i for i in range(1, len(observations)) if (
         observations[i].t - observations[i - 1].t >= MAX_GAP
         or observations[i].tracked.ice.on_ice != observations[i - 1].tracked.ice.on_ice
@@ -116,6 +117,6 @@ def resample(track_id: int, observations: list[Observation], label: Assignment, 
                 "t": t, "frame": nearest_index(source_times, t), "track_id": track_id,
                 "role": label.role, "team": label.team, "x_m": x, "y_m": y, "vx": vx, "vy": vy,
                 "conf": float(np.float32(np.interp(t, times, conf))), "on_ice": on_ice,
-                "interpolated": bool(abs(t - times[nearest]) > .5 / HZ + 1e-8),
+                "interpolated": bool(abs(t - times[nearest]) >= observed_tolerance - 1e-8),
             })
     return rows

@@ -186,12 +186,21 @@ def test_stitch_filter_and_resample_without_extrapolation(rink):
     merged, aliases = stitch(tracks, labels, 5)
     assert aliases == {1: 1, 2: 1, 3: 3, 4: 4}
     assert set(merged) == {1}
-    rows = resample(1, merged[1], labels[1], np.arange(90) / 30, rink)
+    rows = resample(1, merged[1], labels[1], np.arange(90) / 30, rink, sample_fps=5)
     assert [row["t"] for row in rows] == [i / 10 for i in range(19)]
     assert [row["frame"] for row in rows] == [i * 3 for i in range(19)]
     assert rows[1]["interpolated"] and rows[6]["interpolated"]
     assert not rows[0]["interpolated"] and not rows[10]["interpolated"]
     assert all(np.hypot(row["vx"], row["vy"]) <= 12.000001 for row in rows)
+
+
+def test_resample_marks_missing_tick_with_twenty_fps_neighbours(rink):
+    track = observations(0, 5, 1, (155, 60, 30), step=.05)
+    del track[2]
+    rows = resample(1, track, Assignment("player", "A"), np.arange(5) / 20, rink, sample_fps=20)
+    assert [(row["t"], row["interpolated"]) for row in rows] == [
+        (0.0, False), (0.1, True), (0.2, False),
+    ]
 
 
 def test_process_with_synthetic_detector_and_video(tmp_path):
