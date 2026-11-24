@@ -346,12 +346,12 @@ export function Screenshot({ active }: { active: boolean }) {
                 <text x={pair.image_px[0] + picture.size[0] / 150} y={pair.image_px[1]} fill="#ffdb70"
                   fontSize={picture.size[0] / 60}>{i + 1}</text>
               </g>)}
-              {markers.map(marker => <g key={marker.id} data-marker={marker.id}>
-                {marker.bbox && <rect x={marker.bbox[0]} y={marker.bbox[1]} width={marker.bbox[2] - marker.bbox[0]}
-                  height={marker.bbox[3] - marker.bbox[1]} fill="transparent" stroke={markerColor(marker)} vectorEffect="non-scaling-stroke" />}
-                <circle cx={marker.foot[0]} cy={marker.foot[1]} r={picture.size[0] / 135} fill={markerColor(marker)}
-                  stroke={marker.id === selected ? '#ffff70' : 'white'} strokeWidth="2" vectorEffect="non-scaling-stroke" />
-              </g>)}
+              {markers.map(marker => marker.bbox && <rect key={marker.id} data-marker={marker.id}
+                x={marker.bbox[0]} y={marker.bbox[1]} width={marker.bbox[2] - marker.bbox[0]}
+                height={marker.bbox[3] - marker.bbox[1]} fill="transparent" stroke={markerColor(marker)} vectorEffect="non-scaling-stroke" />)}
+              {markers.map(marker => <circle key={marker.id} data-marker={marker.id}
+                cx={marker.foot[0]} cy={marker.foot[1]} r={picture.size[0] / 135} fill={markerColor(marker)}
+                stroke={marker.id === selected ? '#ffff70' : 'white'} strokeWidth="2" vectorEffect="non-scaling-stroke" />)}
             </svg>
           </div>
           <div className="stage"><h2>2D rink</h2>
