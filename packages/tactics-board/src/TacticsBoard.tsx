@@ -166,14 +166,14 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
       }))
       return
     }
-    const t = correction ? activeTime : clip.start_t
+    const t = activeTime
     const keyframe = { t, x_m: point[0], y_m: point[1] }
     edit(previous => {
       const existing = previous.ghosts_json.find(ghost => ghostKey(ghost) === player.key)
       const ghost: Ghost = { track_id: player.trackId, team: player.team, keyframes: [] }
       if (player.manualId) ghost.player_id = player.manualId
       const base = existing ?? ghost
-      const frames = correction && !existing && t > previous.start_t
+      const frames = !existing && t > previous.start_t
         ? [{ t: previous.start_t, x_m: player.point[0], y_m: player.point[1] }] : base.keyframes
       const next = { ...base, keyframes: setKeyframe(frames, keyframe) }
       return {
