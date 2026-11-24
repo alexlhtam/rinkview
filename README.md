@@ -3,8 +3,8 @@
 RinkView aims to turn fixed-camera ice hockey footage into a top-down rink view
 for reviewing team positioning, spacing and coverage. The first target is
 post-game coaching, not player identification or measurement-grade tracking.
-This foundation has rink geometry, file contracts and a calibration overlay.
-It does **not** yet detect or track players, serve a web app, or run live.
+This prototype has rink geometry, file contracts, a calibration overlay and
+a local Game Viewer. It does **not** yet detect or track players or run live.
 
 ## Repository layout
 
@@ -13,7 +13,8 @@ It does **not** yet detect or track players, serve a web app, or run live.
 | `pipeline/` | Independent Python package and tests; no API or database required |
 | `shared/` | Rink templates, sample calibrations and output schemas |
 | `scripts/` | Optional sample clip retrieval |
-| `apps/web/`, `apps/api/` | Reserved for the coaching viewer and API |
+| `apps/web/` | Local Game Viewer |
+| `apps/api/` | Reserved for the API |
 | `worker/`, `training/`, `infra/` | Reserved for background processing, training and deployment |
 | `docs/` | [MVP spec](docs/spec.md) |
 
@@ -57,6 +58,43 @@ The script uses Deno and `--remote-components ejs:github` for YouTube's
 current JavaScript challenges. If access legitimately requires your own local
 browser session, pass `--cookies-from-browser firefox` (or your browser and
 profile). Do not export or share cookies.
+
+## Run the Game Viewer
+
+Use Node.js 22.12+ and a current browser. From the repo root:
+
+```sh
+npm --prefix apps/web ci
+npm --prefix apps/web run generate:demo
+npm --prefix apps/web run dev
+```
+
+Open the URL printed by Vite. Choose the 30-second P1 sample clip or another
+local video, `data/web-demo/positions.json`, `data/web-demo/summary.json` and
+`shared/rink_templates/ally-pally-estimate.json`, then select **Open game**.
+The default template matches the P1 calibration. The generated 14 tracks are
+**synthetic**, not detections from the video: they share the video clock but
+do not correspond to specific players on screen. The clip is not included in
+the repository. No files are uploaded or sent to a backend.
+
+The original 4K clip works in browsers that can decode it smoothly. If needed,
+make a 1080p H.264 copy (preserving the start time and using the synthetic
+data's default 60 fps for frame stepping):
+
+```sh
+ffmpeg -i p1_4k_30s.mp4 -map 0:v:0 -vf "scale=1920:-2,fps=60" -c:v libx264 -pix_fmt yuv420p -t 30 data/p1_1080p_30s.mp4
+```
+
+Use the shared timeline to scrub, play at 0.25–2×, or step through the
+video. Frame stepping estimates the source rate from the positions export
+(30 fps fallback); variable-frame-rate video may not step exactly one frame.
+Select a rink dot or use the track editor to reassign its team for the whole
+track. Team corrections affect the rink, not the imported analytics.
+Use **I**/**O** outside form fields to mark a review range, then open
+**Review clips** to name it or export saved ranges as JSON. Changes and clips
+are available until you replace the game or reload the page.
+
+See [apps/web](apps/web/README.md) for the prototype scope and checks.
 
 ## Running on your GPU (Windows + RTX 4080 Super)
 
