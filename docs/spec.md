@@ -133,7 +133,7 @@ rinkview/
       project/           # image -> rink coords, filtering
       analytics/         # heatmaps, zone time, shape
       export/
-    cli.py               # `rinkview process video.mp4 --camera cam.json`
+    cli.py               # `rinkview process video.mp4 --calib cam.json --out data/results`
   worker/                # RQ worker entrypoint wrapping pipeline
   training/              # dataset tools, label conversion, train/eval scripts
   shared/
