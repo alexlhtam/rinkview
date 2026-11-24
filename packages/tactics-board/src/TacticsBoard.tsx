@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { BoardSurface, INK } from './BoardSurface'
-import { createClip, ghostKey, newId, parseClip, serializeClip, setKeyframe } from './clip'
+import { createClip, newId, parseClip, serializeClip, setKeyframe } from './clip'
 import { download, rinkPng } from './export'
 import { clamp, clampToIce, distance, pointInView, roundTime } from './geometry'
 import { historyOf, push, redo, undo } from './history'
 import { Icon } from './Icons'
-import { boardPlayers, ghostMarkers, teamColor } from './players'
-import type { Player } from './players'
+import { boardPlayers, ghostMarkerKey, ghostMarkers, teamColor } from './players'
+import type { GhostMarker, Player } from './players'
 import { annotationAt, appendPoint, canFinishZone, isDragTool, tools } from './tools'
 import type { DragTool, Tool } from './tools'
 import type { Annotation, Ghost, Point, Role, TacticsBoardProps, TeachingClip, Team } from './types'
@@ -18,7 +18,8 @@ const colors = [
 ] as const
 type Layers = { players: boolean; ghosts: boolean; annotations: boolean }
 type Stroke = { tool: DragTool; points: Point[] }
-type Drag = { tool: 'move' | 'ghost'; player: Player; start: Point; point: Point }
+type Movable = Player | GhostMarker
+type Drag = { tool: 'move' | 'ghost'; player: Movable; start: Point; point: Point }
 type Draft = Stroke | Drag
 
 export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange }: TacticsBoardProps) {
@@ -49,7 +50,8 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   const fileInput = useRef<HTMLInputElement>(null)
   const playerList = boardPlayers(initialPlayers, clip)
   const selectedPlayer = playerList.find(player => player.key === selected)
-  const selectedGhost = clip.ghosts_json.find(ghost => ghostKey(ghost) === selected)
+  const selectedGhost = clip.ghosts_json.find((ghost, index) => ghostMarkerKey(ghost, index) === selected)
+  const selectedMarker = selectedPlayer ?? selectedGhost
   const shownGhosts = layers.ghosts ? ghostMarkers(clip, playerList, playhead) : []
   const shownPlayers = layers.players ? playerList.filter(player => !player.hidden) : []
   const annotations = layers.annotations
@@ -157,11 +159,12 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
     setPolygon([])
   }
 
-  function movePlayer(player: Player, point: Point, correction: boolean) {
-    if (!correction && player.manualId) {
+  function movePlayer(player: Movable, point: Point, correction: boolean) {
+    const source = 'trackId' in player ? player : undefined
+    if (!correction && source?.manualId) {
       edit(previous => ({
         ...previous,
-        added_players_json: previous.added_players_json.map(p => p.id === player.manualId
+        added_players_json: previous.added_players_json.map(p => p.id === source.manualId
           ? { ...p, x_m: point[0], y_m: point[1] } : p),
       }))
       return
@@ -169,10 +172,12 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
     const t = activeTime
     const keyframe = { t, x_m: point[0], y_m: point[1] }
     edit(previous => {
-      const existing = previous.ghosts_json.find(ghost => ghostKey(ghost) === player.key)
-      const ghost: Ghost = { track_id: player.trackId, team: player.team, keyframes: [] }
-      if (player.manualId) ghost.player_id = player.manualId
-      const base = existing ?? ghost
+      const existing = previous.ghosts_json.find((ghost, index) => ghostMarkerKey(ghost, index) === player.key)
+      const base = existing ?? (source && {
+        track_id: source.trackId, team: source.team, keyframes: [],
+        ...(source.manualId ? { player_id: source.manualId } : {}),
+      })
+      if (!base) return previous
       const frames = !existing && t > previous.start_t
         ? [{ t: previous.start_t, x_m: player.point[0], y_m: player.point[1] }] : base.keyframes
       const next = { ...base, keyframes: setKeyframe(frames, keyframe) }
@@ -199,6 +204,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   }
 
   function removeKeyframe(ghost: Ghost, t: number) {
+    if (ghost.keyframes.length === 1 && !selectedPlayer) setSelected(null)
     edit(previous => ({
       ...previous,
       ghosts_json: previous.ghosts_json.flatMap(g => {
@@ -216,9 +222,9 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
 
   function hit(point: Point) {
     const targets = [
-      ...shownGhosts.flatMap(ghost => {
+      ...shownGhosts.map(ghost => {
         const player = playerList.find(p => p.key === ghost.key)
-        return [{ point: ghost.point, player, ghost: true }]
+        return { point: ghost.point, player: player ?? ghost, ghost: true }
       }),
       ...shownPlayers.map(player => ({ point: player.point, player, ghost: false })),
     ]
@@ -377,11 +383,13 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   const displayGhosts = playing ? (layers.ghosts ? ghostMarkers(clip, playerList, currentTime) : []) : shownGhosts
   const displayAnnotations = playing && layers.annotations
     ? clip.annotations_json.filter(a => a.t_from <= currentTime && currentTime <= a.t_to) : annotations
-  const temporaryGhost = dragging && (dragging.tool === 'ghost' || dragging.player.trackId !== null) &&
-    distance(dragging.player.point, dragging.point) > .14 ? {
-      ...dragging.player, original: dragging.player.point, point: dragging.point,
-    } : undefined
-  const displayPlayers = dragging && !temporaryGhost && dragging.tool === 'move' && dragging.player.manualId
+  const movingOriginal = dragging?.tool === 'move' && 'manualId' in dragging.player
+  const temporaryGhost = dragging && !movingOriginal && distance(dragging.start, dragging.point) > .14 ? {
+    ...dragging.player,
+    original: 'trackId' in dragging.player ? dragging.player.point : dragging.player.original,
+    point: dragging.point,
+  } : undefined
+  const displayPlayers = dragging && movingOriginal
     ? shownPlayers.map(player => player.key === dragging.player.key ? { ...player, point: dragging.point } : player)
     : shownPlayers
   const timelineFrames = selectedGhost?.keyframes ??
@@ -524,10 +532,11 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
               aria-label={name} title={name} aria-pressed={color === value} onClick={() => setColor(value)} />)}
           </div>
         </div>
-        {selectedPlayer && <div className="rvb-inspector-block">
-          <h2><span className="rvb-team-dot" style={{ background: teamColor(selectedPlayer.team, selectedPlayer.role) }} />
-            Player {selectedPlayer.caption}</h2>
-          {initialPlayers.find(p => p.track_id === selectedPlayer.trackId)?.on_ice !== false &&
+        {selectedMarker && <div className="rvb-inspector-block">
+          <h2><span className="rvb-team-dot" style={{
+            background: teamColor(selectedMarker.team, selectedPlayer?.role),
+          }} />{selectedPlayer ? `Player ${selectedPlayer.caption}` : 'Ghost player'}</h2>
+          {selectedPlayer && initialPlayers.find(p => p.track_id === selectedPlayer.trackId)?.on_ice !== false &&
             <button onClick={() => toggleHidden(selectedPlayer)}>{selectedPlayer.hidden ? 'Show player' : 'Hide player'}</button>}
           {selectedGhost && <div className="rvb-keyframes">
             <span className="rvb-kicker">GHOST KEYFRAMES</span>

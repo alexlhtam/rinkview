@@ -1,5 +1,5 @@
 import { ghostKey, interpolate } from './clip'
-import type { Point, PositionSample, Role, TeachingClip, Team } from './types'
+import type { Ghost, Point, PositionSample, Role, TeachingClip, Team } from './types'
 
 export interface Player {
   key: string
@@ -36,9 +36,13 @@ export function boardPlayers(frame: readonly PositionSample[], clip: TeachingCli
   ]
 }
 
+export function ghostMarkerKey(ghost: Ghost, index: number) {
+  return ghostKey(ghost) ?? `unlinked:${index}`
+}
+
 export function ghostMarkers(clip: TeachingClip, players: Player[], time: number): GhostMarker[] {
   return clip.ghosts_json.flatMap((ghost, index) => {
-    const key = ghostKey(ghost) ?? `unlinked:${index}`
+    const key = ghostMarkerKey(ghost, index)
     const source = players.find(player => player.key === key)
     const point = interpolate(ghost.keyframes, time)
     if (!point || source?.hidden || (ghost.track_id !== null && clip.hidden_track_ids.includes(ghost.track_id))) return []

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { exampleClip } from '../demo/example'
 import { createClip, interpolate, parseClip, serializeClip, setKeyframe } from './clip'
 import { historyOf, push, redo, undo } from './history'
-import { boardPlayers, ghostMarkers } from './players'
+import { boardPlayers, ghostMarkerKey, ghostMarkers } from './players'
 import type { PositionSample } from './types'
 
 describe('Teaching Clip JSON', () => {
@@ -47,6 +47,22 @@ describe('Teaching Clip JSON', () => {
     clip.annotations_json = []
     clip.ghosts_json = [{ track_id: null, player_id: 'missing', team: 'A', keyframes: [{ t: 0, x_m: 4, y_m: 4 }] }]
     expect(() => parseClip(serializeClip(clip))).toThrow('source player')
+  })
+
+  it('gives each imported ghost without an original a distinct, selectable marker', () => {
+    const clip = createClip()
+    const keyframes = [{ t: 0, x_m: 2, y_m: 4 }]
+    clip.ghosts_json = [
+      { track_id: null, team: 'A', keyframes },
+      { track_id: null, team: 'A', keyframes },
+      { track_id: 10, team: 'B', keyframes },
+    ]
+    const loaded = parseClip(serializeClip(clip))
+    const markers = ghostMarkers(loaded, [], 0)
+    expect(markers.map(marker => marker.key)).toEqual(['unlinked:0', 'unlinked:1', 'track:10'])
+    expect(markers.every(marker => marker.original === undefined)).toBe(true)
+    expect(loaded.ghosts_json.find((ghost, i) => ghostMarkerKey(ghost, i) === markers[1].key))
+      .toBe(loaded.ghosts_json[1])
   })
 })
 
