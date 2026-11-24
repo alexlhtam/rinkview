@@ -11,11 +11,45 @@ It does **not** yet detect or track players, serve a web app, or run live.
 | Directory | Purpose |
 |---|---|
 | `pipeline/` | Independent Python package and tests; no API or database required |
+| `packages/tactics-board/` | Standalone React tactics board, demo and embeddable component |
 | `shared/` | Rink templates, sample calibrations and output schemas |
 | `scripts/` | Optional sample clip retrieval |
 | `apps/web/`, `apps/api/` | Reserved for the coaching viewer and API |
 | `worker/`, `training/`, `infra/` | Reserved for background processing, training and deployment |
 | `docs/` | [MVP spec](docs/spec.md) |
+
+## Coaching tactics board
+
+Run the standalone demo with Node.js 22.12+ (or Node.js 24 LTS) and npm:
+
+```sh
+cd packages/tactics-board
+npm ci
+npm run dev
+```
+
+Start with a blank rink or choose **Load example**. Use **Add player** to place
+skaters by hand, and use the tools on the left to draw routes, mark coverage and
+measure spacing. Choose **Ghost correction** and drag a player from their
+original position. Scrub to another time and drag the ghost again to add a
+keyframe; use **Play animation** to see the interpolation. **Present** opens a
+full-screen board. **Save JSON** and **Load JSON** use the
+[Teaching Clip schema](shared/schemas/teaching-clip.schema.json); **Export PNG**
+saves the board at the current playhead with the current layer settings.
+
+`npm test` runs the Vitest suite; `npm run typecheck` checks the TypeScript; and
+`npm run build` builds the Vite demo and the library.
+
+To embed the built package, import `TacticsBoard` from `@rinkview/tactics-board`
+and its stylesheet from `@rinkview/tactics-board/style.css`. Pass a shared rink
+template as `rinkTemplate`, an optional frozen array of position samples as
+`initialPlayers` (one sample per track), and optionally a saved `initialClip`.
+`onChange(clip)` receives committed edits, imports, and undo/redo, not playback
+or layer changes. Remount with a new React key to initialize a different clip.
+Times are seconds on the source video's timeline (or from zero on a blank
+board). Moving a tracked player creates a correction without changing the
+source. When reopening a clip backed by video, supply the same frozen frame and
+rink template to show its original tracked players.
 
 ## CPU quickstart
 
