@@ -184,6 +184,7 @@
           "then": {
             "properties": {
               "points_m": {
+                "type": "array",
                 "maxItems": 1
               }
             }
@@ -205,6 +206,7 @@
           "then": {
             "properties": {
               "points_m": {
+                "type": "array",
                 "minItems": 2,
                 "maxItems": 2
               }
@@ -222,6 +224,7 @@
           "then": {
             "properties": {
               "points_m": {
+                "type": "array",
                 "minItems": 2
               }
             }
@@ -238,6 +241,7 @@
           "then": {
             "properties": {
               "points_m": {
+                "type": "array",
                 "minItems": 3
               }
             }
