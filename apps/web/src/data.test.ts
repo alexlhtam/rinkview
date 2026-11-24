@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import summary from '../../../shared/schemas/summary.example.json';
 import positions from '../../../shared/schemas/positions.example.json';
 import custom from '../../../shared/rink_templates/ally-pally-estimate.json';
-import { loadLocalGame } from './data';
+import { loadLocalGame, loadReplacementGame } from './data';
+import { canDiscardTeachingDraft, teachingFrame } from './teaching';
 
 function json(name: string, value: unknown, path?: string, lastModified = 0) {
   const file = new File([JSON.stringify(value)], name, { lastModified });
@@ -60,5 +61,28 @@ describe('local pipeline outputs', () => {
 
   it('reports a folder without both export files', async () => {
     await expect(loadLocalGame({ video, folder: [folder[0]] })).rejects.toThrow('positions.json and summary.json');
+  });
+
+  it('requires confirmation to replace a game with unsaved board edits even when reopening the same files', async () => {
+    const files = { video, folder };
+    const current = await loadLocalGame(files);
+    const { clip } = await teachingFrame(current, 0, 5, new Map());
+    const draft = { clip: { ...clip, title: 'Cover the slot' }, savedClip: clip };
+    const confirmDiscard = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const canReplace = () => canDiscardTeachingDraft(draft, confirmDiscard);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    try {
+      expect(await loadReplacementGame(files, canReplace)).toBeNull();
+      expect(revoke).toHaveBeenCalledTimes(1);
+      expect(revoke).not.toHaveBeenCalledWith(current.videoUrl);
+      const next = await loadReplacementGame(files, canReplace);
+      expect(next?.videoId).toBe(current.videoId);
+      expect(next?.videoUrl).not.toBe(current.videoUrl);
+      expect(confirmDiscard).toHaveBeenCalledTimes(2);
+      next?.dispose();
+    } finally {
+      revoke.mockRestore();
+      current.dispose();
+    }
   });
 });

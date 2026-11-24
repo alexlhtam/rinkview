@@ -152,3 +152,10 @@ export async function loadLocalGame(files: GameFiles): Promise<GameData> {
     dispose: () => URL.revokeObjectURL(videoUrl),
   };
 }
+
+export async function loadReplacementGame(files: GameFiles, canReplace: () => boolean): Promise<GameData | null> {
+  const next = await loadLocalGame(files);
+  if (canReplace()) return next;
+  next.dispose();
+  return null;
+}

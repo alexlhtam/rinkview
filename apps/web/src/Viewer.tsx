@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import type { FormEvent, Ref } from 'react';
 import { TacticsBoard, parseClip } from '@rinkview/tactics-board/source';
 import type { TeachingClip } from '@rinkview/tactics-board/source';
 import type { GameData } from './data';
@@ -12,7 +12,7 @@ import { Insights } from './Insights';
 import { makeClip } from './clips';
 import type { Clip } from './clips';
 import { activityBars } from './timeline';
-import { switchTeachingDraft, teachingFrame } from './teaching';
+import { canDiscardTeachingDraft, switchTeachingDraft, teachingFrame } from './teaching';
 import type { TeachingDraft } from './teaching';
 import { TEAM_COLORS } from './rinkGeometry';
 
@@ -41,7 +41,11 @@ function FrameIcon({ back }: { back?: boolean }) {
     style={{ transform: back ? 'scaleX(-1)' : undefined }}><path d="M5 4.5 13 10l-8 5.5zm9 0h1.8v11H14z" /></svg>;
 }
 
-export function Viewer({ game }: { game: GameData }) {
+export interface ViewerHandle {
+  confirmDiscardDraft(): boolean;
+}
+
+export function Viewer({ game, ref }: { game: GameData; ref?: Ref<ViewerHandle> }) {
   const { videoRef, time, duration, playing, speed, error, seek, step, toggle, changeSpeed, pauseAtDisplayedFrame } = usePlayback();
   const { samples, windowError } = usePositionWindow(game.positions, time);
   const { filters, toggleFilter, trails, setTrails, ids, toggleIds } = useViewSettings();
@@ -68,6 +72,11 @@ export function Viewer({ game }: { game: GameData }) {
   const percent = (t: number) => duration ? Math.min(100, t * 100 / duration) : 0;
   const bars = useMemo(() => activityBars(game.activity, duration), [game.activity, duration]);
   const soloPeriod = game.summary.periods.length === 1 ? game.summary.periods[0].period : undefined;
+
+  useImperativeHandle(ref, () => ({
+    confirmDiscardDraft: () => canDiscardTeachingDraft(boardDraft.current,
+      () => window.confirm('Discard unsaved Teaching Clip edits and open these game files?')),
+  }), []);
 
   useEffect(() => {
     if (board) return;

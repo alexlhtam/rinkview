@@ -9,11 +9,15 @@ export interface TeachingDraft {
   savedClip: TeachingClip;
 }
 
+export function canDiscardTeachingDraft(current: TeachingDraft | null, confirmDiscard: () => boolean): boolean {
+  return !current || current.clip === current.savedClip || confirmDiscard();
+}
+
 export function switchTeachingDraft(
   current: TeachingDraft | null, nextClip: TeachingClip, loadingClip: boolean, confirmDiscard: () => boolean,
 ): TeachingDraft | null {
   if (!loadingClip && current?.clip.start_t === nextClip.start_t) return current;
-  if (current && current.clip !== current.savedClip && !confirmDiscard()) return null;
+  if (!canDiscardTeachingDraft(current, confirmDiscard)) return null;
   return { clip: nextClip, savedClip: nextClip };
 }
 

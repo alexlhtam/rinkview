@@ -1,9 +1,10 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadLocalGame } from './data';
+import { loadReplacementGame } from './data';
 import type { GameData } from './data';
 import { Viewer } from './Viewer';
+import type { ViewerHandle } from './Viewer';
 import './style.css';
 
 function Brand() {
@@ -31,6 +32,7 @@ function App() {
   const [showFiles, setShowFiles] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const viewer = useRef<ViewerHandle>(null);
 
   useEffect(() => () => game?.dispose(), [game]);
 
@@ -50,8 +52,12 @@ function App() {
     setError('');
     setLoading(true);
     try {
-      const next = await loadLocalGame({ video, positions: file('positions'), summary: file('summary'),
-        rink: file('rink'), calibration: file('calibration'), folder: form.getAll('folder').filter(picked) });
+      const next = await loadReplacementGame(
+        { video, positions: file('positions'), summary: file('summary'),
+          rink: file('rink'), calibration: file('calibration'), folder: form.getAll('folder').filter(picked) },
+        () => viewer.current?.confirmDiscardDraft() ?? true,
+      );
+      if (!next) return;
       setGame(next);
       setShowFiles(false);
     } catch (cause) {
@@ -95,7 +101,7 @@ function App() {
               {loading ? 'Loading…' : 'Open game'}</button>{error && <p role="alert">{error}</p>}</div>
           </form>
         </section>}
-        {game && <Viewer game={game} key={game.videoUrl} />}
+        {game && <Viewer ref={viewer} game={game} key={game.videoUrl} />}
       </main>
     </>
   );
