@@ -7,6 +7,7 @@ import type { GhostMarker, Player } from './players'
 import type { Annotation, Point, RinkTemplate } from './types'
 
 export const INK = '#124eaa'
+export const EDITOR_MARKER_RADIUS = .74
 
 function LineArrow({ from, to, color, dashed = false, weight = .24 }: {
   from: Point; to: Point; color: string; dashed?: boolean; weight?: number
@@ -107,7 +108,7 @@ export function BoardSurface({
       const scale = Math.min(pixelWidth / width, pixelHeight / height)
       ctx.setTransform(scale, 0, 0, scale, pixelWidth / 2, pixelHeight / 2)
       const faded = new Set(ghosts.map(ghost => ghost.key))
-      const markerRadius = presentation ? .94 : .74
+      const markerRadius = presentation ? .94 : EDITOR_MARKER_RADIUS
       for (const player of players) {
         const [x, y] = toSvg(player.point)
         ctx.globalAlpha = faded.has(player.key) ? .29 : 1
@@ -151,7 +152,7 @@ export function BoardSurface({
       {ghosts.map(ghost => {
         const point = toSvg(ghost.point)
         const color = teamColor(ghost.team, ghost.role)
-        const radius = presentation ? .94 : .74
+        const radius = presentation ? .94 : EDITOR_MARKER_RADIUS
         const from = ghost.original ? toSvg(ghost.original) : undefined
         const length = from ? distance(from, point) : 0
         const end = from && length > radius * 2.1

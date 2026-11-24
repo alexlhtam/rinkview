@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import { BoardSurface, INK } from './BoardSurface'
+import { BoardSurface, EDITOR_MARKER_RADIUS, INK } from './BoardSurface'
 import { createClip, ghostKey, newId, parseClip, serializeClip, setKeyframe } from './clip'
 import { download, rinkPng } from './export'
 import { clamp, clampToIce, distance, pointInView } from './geometry'
@@ -221,11 +221,14 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   }
 
   function hit(point: Point) {
+    const ghosts = [...shownGhosts].reverse().map(ghost => {
+      const player = playerList.find(p => p.key === ghost.key)
+      return { point: ghost.point, player: player ?? ghost, ghost: true }
+    })
+    const topGhost = ghosts.find(ghost => distance(point, ghost.point) <= EDITOR_MARKER_RADIUS)
+    if (topGhost) return topGhost
     const targets = [
-      ...shownGhosts.map(ghost => {
-        const player = playerList.find(p => p.key === ghost.key)
-        return { point: ghost.point, player: player ?? ghost, ghost: true }
-      }),
+      ...ghosts,
       ...shownPlayers.map(player => ({ point: player.point, player, ghost: false })),
     ]
     const radius = 1.25
