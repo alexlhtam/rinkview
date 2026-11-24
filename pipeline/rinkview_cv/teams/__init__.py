@@ -213,7 +213,7 @@ def classify(tracks, rink, a_defends=None, *, team_a_jersey="light", switch_gap=
     centres = _two_means(np.asarray(features), np.asarray(weights))
     if centres is not None and team_a_jersey == "dark":
         centres = centres[::-1]
-    votes, switches, end_votes = {}, {}, []
+    votes, switches, end_votes, goalie_votes = {}, {}, [], set()
     if centres is not None:
         for track_id, observations in tracks.items():
             if roles[track_id] == "referee":
@@ -222,15 +222,22 @@ def classify(tracks, rink, a_defends=None, *, team_a_jersey="light", switch_gap=
             votes[track_id] = _vote(distances, confidence)
             valid = confidence > 0
             if track_id in goalie_end and valid.any():
+                end = goalie_end[track_id]
+                goalie_votes.add((end, end if votes[track_id] == "A" else -end))
                 margin = distances[valid, 1] - distances[valid, 0]
-                end_votes.append(goalie_end[track_id] * np.average(margin, weights=confidence[valid]))
+                end_votes.append(end * np.average(margin, weights=confidence[valid]))
             if roles[track_id] == "player" and switch_gap is not None:
                 switch = _clear_team_switch(observations, distances, confidence, switch_gap)
                 if switch:
                     switches[track_id] = switch
 
     if a_defends is None:
-        a_defends = 1 if sum(end_votes) > 0 else -1
+        if goalie_votes == {(-1, 1), (1, 1)}:
+            a_defends = 1
+        elif goalie_votes == {(-1, -1), (1, -1)}:
+            a_defends = -1
+        else:
+            a_defends = 1 if sum(end_votes) > 0 else -1
     labels = {}
     for track_id, role in roles.items():
         if role == "referee":

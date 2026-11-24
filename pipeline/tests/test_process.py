@@ -157,6 +157,25 @@ def test_classification_and_explicit_roles(rink):
     assert classify(tracks, rink, team_a_jersey="dark")[0][1] == Assignment("player", "A")
 
 
+def test_agreeing_goalie_votes_take_priority_over_outlier_crops(rink):
+    def jersey_track(track_id, lightness, x=0, role="player"):
+        track = observations(0, len(lightness), track_id, (155, 60, 30), x0=x, role=role)
+        return [replace(o, jersey=replace(o.jersey, colours=np.array([value])))
+                for o, value in zip(track, lightness)]
+
+    tracks = {
+        1: jersey_track(1, [0.] * 10),
+        2: jersey_track(2, [1.] * 10),
+        3: jersey_track(3, [.49] * 3 + [1.], -rink.goal_x, "goalie"),
+        4: jersey_track(4, [.51] * 3 + [0.], rink.goal_x, "goalie"),
+    }
+    labels, side, _ = classify(tracks, rink)
+    assert side == 1
+    assert labels[3] == Assignment("goalie", "B")
+    assert labels[4] == Assignment("goalie", "A")
+    assert classify(tracks, rink, a_defends=-1)[1] == -1
+
+
 def test_team_fit_ignores_outlier_jerseys_at_the_boards_when_possible(rink):
     tracks = {
         1: observations(0, 10, 1, (170, 80, 35)),
