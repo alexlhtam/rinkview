@@ -15,7 +15,7 @@ Box = tuple[float, float, float, float]
 class Detection:
     xyxy: Box
     conf: float
-    role: Role = "player"
+    role: Role | Literal["person"] = "person"
 
 
 class Detector(Protocol):
@@ -42,7 +42,7 @@ class YoloDetector:
         self.device = "0" if device == "cuda" else device
         self.model = YOLO(str(weights))
         self.roles = {
-            index: "player" if name == "person" else name
+            index: name
             for index, name in self.model.names.items()
             if name in {"person", "player", "goalie", "referee"}
         }

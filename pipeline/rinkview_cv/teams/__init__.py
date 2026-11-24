@@ -69,7 +69,9 @@ def classify(tracks, rink, a_defends=None):
     jerseys, centre_jerseys, roles, goalie_end, goalie_candidates = {}, {}, {}, {}, {-1: [], 1: []}
     for track_id, observations in tracks.items():
         votes = Counter(o.tracked.ice.detection.role for o in observations)
-        roles[track_id] = votes.most_common(1)[0][0]
+        votes.pop("person", None)
+        generic = not votes
+        roles[track_id] = "player" if generic else votes.most_common(1)[0][0]
         confident = sorted(
             (o for o in observations if o.jersey is not None),
             key=lambda o: -o.tracked.ice.detection.conf,
@@ -81,7 +83,7 @@ def classify(tracks, rink, a_defends=None):
         if len(away_from_boards) >= 3:
             centre_jerseys[track_id] = np.mean([j.colours for j in away_from_boards], axis=0)
         jerseys[track_id] = [o.jersey for o in confident[:5]]
-        if roles[track_id] == "player" and len(jerseys[track_id]) >= 3:
+        if generic and len(jerseys[track_id]) >= 3:
             if sum(j.stripes for j in jerseys[track_id]) >= .8 * len(jerseys[track_id]):
                 roles[track_id] = "referee"
         if roles[track_id] == "referee":
@@ -93,7 +95,7 @@ def classify(tracks, rink, a_defends=None):
         duration = observations[-1].t - observations[0].t
         if roles[track_id] == "goalie":
             goalie_end[track_id] = end
-        elif duration >= 2 and fraction >= .82:
+        elif generic and duration >= 2 and fraction >= .82:
             goalie_candidates[end].append((duration * fraction, track_id))
 
     for end, candidates in goalie_candidates.items():

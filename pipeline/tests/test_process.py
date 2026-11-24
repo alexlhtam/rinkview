@@ -41,16 +41,17 @@ def test_sampling_with_irregular_timestamps_and_detector_tiles():
 
 def test_yolo_adapter_preserves_custom_roles_and_full_frame_coordinates(monkeypatch):
     class FakeModel:
-        names = {0: "player", 1: "goalie", 2: "referee", 3: "puck"}
+        names = {0: "player", 1: "goalie", 2: "referee", 3: "puck", 4: "person"}
 
         def __init__(self, weights):
             assert weights == "test.pt"
 
         def predict(self, tiles, **kwargs):
             assert [tile.shape for tile in tiles] == [(90, 80, 3)]
-            assert kwargs["classes"] == [0, 1, 2]
+            assert kwargs["classes"] == [0, 1, 2, 4]
             assert kwargs["device"] == "0"
-            data = SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: np.array([[1, 3, 6, 8, .8, 2]])))
+            boxes = np.array([[1, 3, 6, 8, .8, 2], [10, 3, 16, 8, .7, 4]])
+            data = SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: boxes))
             return [SimpleNamespace(boxes=SimpleNamespace(data=data))]
 
     monkeypatch.setitem(sys.modules, "ultralytics", SimpleNamespace(YOLO=FakeModel))
@@ -58,6 +59,7 @@ def test_yolo_adapter_preserves_custom_roles_and_full_frame_coordinates(monkeypa
     detector = YoloDetector("cuda", "test.pt")
     assert detector.detect(np.zeros((150, 150, 3), np.uint8), (20, 30, 100, 120)) == [
         Detection((21, 33, 26, 38), .8, "referee"),
+        Detection((30, 33, 36, 38), .7, "person"),
     ]
 
 
@@ -141,6 +143,17 @@ def test_team_fit_ignores_outlier_jerseys_at_the_boards_when_possible(rink):
         tracks[track_id] = observations(0, 10, track_id, (50, 180, 85), y0=-11)
     labels, _ = classify(tracks, rink)
     assert {labels[1].team, labels[2].team} == {"A", "B"}
+
+
+def test_goalie_heuristic_only_relabels_generic_people(rink):
+    pale = (245, 245, 245)
+    tracks = {
+        1: observations(0, 12, 1, pale, x0=-rink.goal_x, role="player"),
+        2: observations(0, 12, 2, pale, x0=rink.goal_x, role="person"),
+    }
+    assigned, _ = classify(tracks, rink)
+    assert assigned[1].role == "player"
+    assert assigned[2].role == "goalie"
 
 
 def test_stitch_filter_and_resample_without_extrapolation(rink):

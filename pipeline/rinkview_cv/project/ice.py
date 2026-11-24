@@ -118,7 +118,7 @@ class IceFilter:
             foot = (x, y2 - .03 * height)
             board = float(np.interp(x, self.board_x, self.board_y)) if self.board_x else None
             if (board is not None and board - y2 >= 32 * self.scale
-                    and detection.role == "player" and detection.conf >= .4 and self._inside(foot)):
+                    and detection.role in {"person", "player"} and detection.conf >= .4 and self._inside(foot)):
                 self.heights.append((*foot, height))
             candidates.append((detection, foot, y1, y2, height, board))
 
