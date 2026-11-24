@@ -117,6 +117,25 @@ class Assignment:
     team: str
 
 
+def classify_image(detections, jerseys):
+    roles = [
+        detection.role if detection.role != "person" else
+        "referee" if jersey is not None and jersey.stripes else "player"
+        for detection, jersey in zip(detections, jerseys)
+    ]
+    players = [i for i, role in enumerate(roles)
+               if role == "player" and jerseys[i] is not None and detections[i].conf > 0]
+    centres = _two_means(
+        np.array([jerseys[i].colours for i in players]),
+        np.array([detections[i].conf for i in players]),
+    )
+    return [
+        Assignment(role, "AB"[int(((centres - jersey.colours) ** 2).sum(axis=1).argmin())]
+                   if role != "referee" and jersey is not None and centres is not None else "none")
+        for role, jersey in zip(roles, jerseys)
+    ]
+
+
 def _team_votes(observations, centres):
     distances = np.full((len(observations), 2), np.nan)
     weights = np.zeros(len(observations))

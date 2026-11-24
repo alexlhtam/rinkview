@@ -5,6 +5,7 @@ import { loadReplacementGame } from './data';
 import type { GameData } from './data';
 import { Viewer } from './Viewer';
 import type { ViewerHandle } from './Viewer';
+import { Screenshot } from './Screenshot';
 import './style.css';
 
 function Brand() {
@@ -28,6 +29,7 @@ const INPUTS = [
 ] as const;
 
 function App() {
+  const [mode, setMode] = useState<'screenshot' | 'video'>('screenshot');
   const [game, setGame] = useState<GameData | null>(null);
   const [showFiles, setShowFiles] = useState(true);
   const [error, setError] = useState('');
@@ -74,6 +76,17 @@ function App() {
         <div className="session-status micro"><i /> LOCAL SESSION</div>
       </div></header>
       <main className="shell">
+        <nav className="controls mode-switch" aria-label="Coaching workspace mode">
+          <button aria-pressed={mode === 'screenshot'} onClick={() => setMode('screenshot')}>Screenshot</button>
+          <button aria-pressed={mode === 'video'} onClick={() => setMode('video')}>Video add-on</button>
+        </nav>
+        {mode === 'screenshot' && <div className="page-heading">
+          <div className="eyebrow"><span /> COACHING WHITEBOARD</div>
+          <h1>Screenshot review</h1>
+          <p>Map the skaters from a still image, correct their positions, and open your coaching whiteboard.</p>
+        </div>}
+        <Screenshot active={mode === 'screenshot'} />
+        <div hidden={mode !== 'video'}>
         <div className="page-heading flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="eyebrow"><span /> REVIEW DESK</div>
@@ -102,6 +115,7 @@ function App() {
           </form>
         </section>}
         {game && <Viewer ref={viewer} game={game} key={game.videoUrl} />}
+        </div>
       </main>
     </>
   );

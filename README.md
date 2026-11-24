@@ -1,24 +1,75 @@
 # RinkView
 
-RinkView aims to turn fixed-camera ice hockey footage into a top-down rink view
-for reviewing team positioning, spacing and coverage. The first target is
-post-game coaching, not player identification or measurement-grade tracking.
-The prototype includes a calibration overlay, a pipeline that tracks skaters
-and exports positions and analytics, and a local Game Viewer with a coaching
-tactics board. It does not run live.
+RinkView turns ice hockey screenshots into editable player positions on a
+coaching whiteboard. The MVP is for post-game review of positioning, spacing
+and coverage, not player identification or measurement-grade tracking.
+The fixed-camera video pipeline and Game Viewer are available as an add-on.
 
 ## Repository layout
 
 | Directory | Purpose |
 |---|---|
-| `pipeline/` | Independent Python package and tests; no API or database required |
+| `pipeline/` | Python vision CLI, local screenshot API and tests; no database required |
 | `packages/tactics-board/` | Standalone React tactics board, demo and embeddable component |
 | `shared/` | Rink templates, sample calibrations and output schemas |
 | `scripts/` | Optional sample clip retrieval |
-| `apps/web/` | Local Game Viewer |
-| `apps/api/` | Reserved for the API |
+| `apps/web/` | Screenshot review, whiteboard and optional Game Viewer |
 | `worker/`, `training/`, `infra/` | Reserved for background processing, training and deployment |
 | `docs/` | [MVP spec](docs/spec.md) |
+
+## Screenshot MVP quickstart
+
+Install Python 3.10+ and Node.js 22.12+ (or Node 24 LTS). From the repository
+root, create and activate a virtual environment (on Windows use
+`.venv\Scripts\Activate.ps1`), then run:
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e './pipeline[image,test]'
+rinkview serve --device cpu
+```
+
+In another terminal:
+
+```sh
+npm ci
+npm run dev
+```
+
+Open the URL shown by Vite. The **Screenshot** mode is the default:
+
+1. Drop, paste or choose a screenshot from the game.
+2. Select a saved calibration only if it is for the **same camera view**, not
+   just the same resolution. For a new view, choose a rink template, click four
+   or more named landmarks spread across the ice, and fit the calibration.
+   Check the projected lines and reprojection RMS in metres. If the projection
+   includes spectators or benches, trace the visible ice before analyzing.
+   Download the JSON
+   for later use (place it next to the shared calibrations for CLI use).
+3. Select **Analyze screenshot**. Correct the proposed positions by dragging
+   skate markers, deleting false positives, adding missing players, or choosing
+   a different team or role. You can also do this entirely by hand without the
+   detector. Name the teams and choose their colors.
+4. **Send to whiteboard** to annotate the corrected positions. **Save JSON**
+   retains the positions and screenshot filename, and includes a small image
+   only if you selected **Include thumbnail**. Load the JSON on the same rink.
+
+The API binds only to `127.0.0.1:8000`; Vite proxies the analysis request there.
+The model may download its weights on first run, but your images are not
+uploaded. Detections and jersey clustering are suggestions: nearby spectators,
+occlusion, dark jerseys, and small or non-standard referee kits can cause
+misclassifications. The generic detector does not distinguish goalies.
+
+To run a single image without the web app:
+
+```sh
+rinkview detect-image screenshot.jpg --calib shared/calibrations/ally-pally-side-p1.json --device cpu
+```
+
+Omit `--calib` for image-space detections only. Use `--device cuda` with
+CUDA-enabled PyTorch (see [GPU setup](#running-on-your-gpu-windows--rtx-4080-super)).
 
 ## Coaching tactics board
 
@@ -52,7 +103,7 @@ board). Moving a tracked player creates a correction without changing the
 source. When reopening a clip backed by video, supply the same frozen frame and
 rink template to show its original tracked players.
 
-## CPU quickstart
+## Video add-on: CPU quickstart
 
 From the repo root, with Python 3.10+:
 
@@ -126,7 +177,7 @@ current JavaScript challenges. If access legitimately requires your own local
 browser session, pass `--cookies-from-browser firefox` (or your browser and
 profile). Do not export or share cookies.
 
-## Run the Game Viewer
+## Video add-on: Run the Game Viewer
 
 Use Node.js 22.12+ and a current browser. From the repo root, run `npm ci` once,
 then start the viewer with:
@@ -135,7 +186,7 @@ then start the viewer with:
 npm run dev
 ```
 
-Open the URL printed by Vite. Choose the same **Match video** you processed
+Open the URL printed by Vite and switch to **Video add-on**. Choose the same **Match video** you processed
 (or a time-aligned playback copy), select the **Pipeline output folder** (for
 example `data/outputs/p1` from the CPU quickstart), and pick the **Camera
 calibration** used by the pipeline. Then select **Open game**. If your browser

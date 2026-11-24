@@ -61,6 +61,16 @@ h1 { margin-block: 3px 2px; font-size: clamp(32px, 3.1vw, 46px); font-weight: 82
 .video-stage { border-right: 1px solid var(--border); }
 .stage-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin: 0 2px 9px; }
 .stage-head h2 { display: flex; align-items: center; gap: 7px; }
+.mode-switch { padding-top: 14px; }
+.mode-switch button[aria-pressed=true], .screenshot button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.screenshot-tools { display: grid; gap: 7px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.screenshot-tools p, .screenshot-tools label { font-size: 12px; }
+.screenshot-tools input:not([type=file]) { margin-left: 6px; border: 1px solid var(--border); padding: 4px; }
+.screenshot .stage { gap: 7px; }
+.screenshot-editor, .screenshot-rink { width: 100%; border-radius: 7px; background: #192a40; }
+.screenshot-editor { cursor: crosshair; touch-action: none; }
+.screenshot-editor [data-marker], .screenshot-rink circle { cursor: grab; }
+.screenshot-error { padding: 12px 14px; color: #ff9fae; }
 .view-index { color: #a1b8d4; border: 1px solid #354862; border-radius: 4px; font: 650 9px var(--mono); padding: 3px 4px; }
 .viewport, .rink-viewport { min-height: 0; position: relative; flex: 1; display: grid; align-items: center; border-radius: 7px; overflow: hidden; }
 .viewport { background: #050a11; }

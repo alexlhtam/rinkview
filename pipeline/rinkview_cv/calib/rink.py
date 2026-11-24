@@ -84,7 +84,11 @@ class RinkTemplate:
 
 def load_rink_template(path: str | Path) -> RinkTemplate:
     with Path(path).open(encoding="utf-8") as handle:
-        rink = RinkTemplate(**json.load(handle))
+        return parse_rink_template(json.load(handle))
+
+
+def parse_rink_template(config: dict) -> RinkTemplate:
+    rink = RinkTemplate(**config)
     r = rink.corner_radius_m
     if not 0 < r <= min(rink.length_m, rink.width_m) / 2:
         raise ValueError("invalid rink dimensions or corner radius")

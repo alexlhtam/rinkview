@@ -22,7 +22,7 @@ type Movable = Player | GhostMarker
 type Drag = { tool: 'move' | 'ghost'; player: Movable; start: Point; point: Point }
 type Draft = Stroke | Drag
 
-export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onSaveClip, onOpenClip, teamColors }: TacticsBoardProps) {
+export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onSaveClip, onOpenClip, teamColors, teamNames }: TacticsBoardProps) {
   const [history, setHistory] = useState(() =>
     historyOf(initialClip ?? createClip(initialPlayers[0]?.t ?? 0)))
   const clip = history.current
@@ -473,7 +473,9 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
             onChange={event => setText(event.target.value)} />}
           {tool === 'player' && <div className="rvb-context-controls">
             <select aria-label="New player team" value={team} onChange={event => setTeam(event.target.value as Team)}>
-              <option value="A">Team A</option><option value="B">Team B</option><option value="none">Neutral</option>
+              <option value="A">{teamNames?.A ?? 'Team A'}</option>
+              <option value="B">{teamNames?.B ?? 'Team B'}</option>
+              <option value="none">{teamNames?.none ?? 'Neutral'}</option>
             </select>
             <select aria-label="New player role" value={role} onChange={event => setRole(event.target.value as Role)}>
               <option value="player">Skater</option><option value="goalie">Goalie</option><option value="referee">Referee</option>

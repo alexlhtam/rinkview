@@ -3,7 +3,7 @@ import { exampleClip } from '../demo/example'
 import { createClip, interpolate, parseClip, serializeClip, setKeyframe } from './clip'
 import { historyOf, push, redo, undo } from './history'
 import { boardPlayers, ghostMarkerKey, ghostMarkers, withGhostKeyframes } from './players'
-import type { PositionSample } from './types'
+import type { PositionSample, TeachingClip } from './types'
 
 describe('Teaching Clip JSON', () => {
   it('round-trips annotations, metadata, tracked and manual ghosts, and visibility', () => {
@@ -24,6 +24,15 @@ describe('Teaching Clip JSON', () => {
 
   it('accepts a standalone freeze frame with no video and a zero-length range', () => {
     const clip = { ...createClip(), end_t: 0 }
+    expect(parseClip(serializeClip(clip))).toEqual(clip)
+  })
+
+  it('round-trips a screenshot reference and its portable player positions', () => {
+    const clip: TeachingClip = {
+      ...createClip(),
+      screenshot: { filename: 'game.png', thumbnail: 'data:image/jpeg;base64,YQ==' },
+      added_players_json: [{ id: 'skater-1', team: 'A', role: 'player', x_m: 1, y_m: -2 }],
+    }
     expect(parseClip(serializeClip(clip))).toEqual(clip)
   })
 
