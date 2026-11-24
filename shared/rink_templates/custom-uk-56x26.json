@@ -1,0 +1,18 @@
+{
+  "id": "custom-uk-56x26",
+  "length_m": 56,
+  "width_m": 26,
+  "corner_radius_m": 8.5,
+  "goal_line_from_end_m": 4,
+  "blue_line_from_centre_m": 8.5,
+  "faceoff_circle_radius_m": 4.5,
+  "end_faceoff": {
+    "from_goal_line_m": 6,
+    "from_centre_y_m": 7
+  },
+  "neutral_faceoff": {
+    "from_blue_line_m": 1.5,
+    "from_centre_y_m": 7
+  },
+  "goal_width_m": 1.8288
+}

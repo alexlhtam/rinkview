@@ -1,0 +1,22 @@
+{
+  "id": "nhl",
+  "length_m": 60.96,
+  "width_m": 25.908,
+  "corner_radius_m": 8.5344,
+  "goal_line_from_end_m": 3.3528,
+  "blue_line_from_centre_m": 7.62,
+  "faceoff_circle_radius_m": 4.572,
+  "end_faceoff": {
+    "from_goal_line_m": 6.096,
+    "from_centre_y_m": 6.7056
+  },
+  "neutral_faceoff": {
+    "from_blue_line_m": 1.524,
+    "from_centre_y_m": 6.7056
+  },
+  "goal_width_m": 1.8288,
+  "trapezoid": {
+    "goal_line_half_width_m": 3.3528,
+    "end_boards_half_width_m": 4.2672
+  }
+}

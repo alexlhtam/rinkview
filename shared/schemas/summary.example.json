@@ -1,0 +1,62 @@
+{
+  "periods": [
+    {
+      "period": 1,
+      "zone_time": {
+        "A": {
+          "defensive_s": 0,
+          "neutral_s": 0,
+          "offensive_s": 0
+        },
+        "B": {
+          "defensive_s": 0,
+          "neutral_s": 0,
+          "offensive_s": 0
+        }
+      },
+      "heatmaps": {
+        "A": {
+          "x_min_m": -3,
+          "y_min_m": 0,
+          "cell_size_m": 1,
+          "grid": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "B": {
+          "x_min_m": -3,
+          "y_min_m": 0,
+          "cell_size_m": 1,
+          "grid": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "track_counts": {
+        "A": 1,
+        "B": 0,
+        "none": 0
+      }
+    }
+  ],
+  "processing_stats": {
+    "source_frames": 1,
+    "processed_frames": 1,
+    "elapsed_s": 0.2
+  },
+  "drift_warnings": []
+}

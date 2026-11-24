@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rinkview-cv"
+version = "0.1.0"
+description = "Independent rink calibration and vision utilities for RinkView"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.23", "opencv-python-headless>=4.8,<6"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "jsonschema>=4.18"]
+
+[project.scripts]
+rinkview = "rinkview_cv.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["rinkview_cv*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

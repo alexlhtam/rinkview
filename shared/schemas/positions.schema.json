@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RinkView positions",
+  "description": "JSON export of a single video’s positions.parquet, with one object per track sample. x_m, y_m, vx, vy and conf use float32 in Parquet; velocity is in m/s. No nulls.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "t",
+      "frame",
+      "track_id",
+      "role",
+      "team",
+      "x_m",
+      "y_m",
+      "vx",
+      "vy",
+      "conf",
+      "on_ice",
+      "interpolated"
+    ],
+    "properties": {
+      "t": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Seconds from the start of the source video; float64."
+      },
+      "frame": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647,
+        "description": "Zero-based source frame; int32."
+      },
+      "track_id": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647,
+        "description": "Video-local track ID after stitching; int32."
+      },
+      "role": {
+        "enum": [
+          "player",
+          "goalie",
+          "referee"
+        ]
+      },
+      "team": {
+        "enum": [
+          "A",
+          "B",
+          "none"
+        ]
+      },
+      "x_m": {
+        "type": "number"
+      },
+      "y_m": {
+        "type": "number"
+      },
+      "vx": {
+        "type": "number"
+      },
+      "vy": {
+        "type": "number"
+      },
+      "conf": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "on_ice": {
+        "type": "boolean"
+      },
+      "interpolated": {
+        "type": "boolean"
+      }
+    }
+  }
+}

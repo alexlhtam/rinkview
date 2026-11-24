@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RinkView processing summary",
+  "description": "One source video per summary; period, drift and grid semantics are described in the contract README.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "periods",
+    "processing_stats",
+    "drift_warnings"
+  ],
+  "properties": {
+    "periods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "period",
+          "zone_time",
+          "heatmaps",
+          "track_counts"
+        ],
+        "properties": {
+          "period": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "zone_time": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "A",
+              "B"
+            ],
+            "properties": {
+              "A": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "defensive_s",
+                  "neutral_s",
+                  "offensive_s"
+                ],
+                "properties": {
+                  "defensive_s": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "neutral_s": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "offensive_s": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              },
+              "B": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "defensive_s",
+                  "neutral_s",
+                  "offensive_s"
+                ],
+                "properties": {
+                  "defensive_s": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "neutral_s": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "offensive_s": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "heatmaps": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "A",
+              "B"
+            ],
+            "properties": {
+              "A": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x_min_m",
+                  "y_min_m",
+                  "cell_size_m",
+                  "grid"
+                ],
+                "properties": {
+                  "x_min_m": {
+                    "type": "number"
+                  },
+                  "y_min_m": {
+                    "type": "number"
+                  },
+                  "cell_size_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "grid": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "B": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x_min_m",
+                  "y_min_m",
+                  "cell_size_m",
+                  "grid"
+                ],
+                "properties": {
+                  "x_min_m": {
+                    "type": "number"
+                  },
+                  "y_min_m": {
+                    "type": "number"
+                  },
+                  "cell_size_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "grid": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "track_counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "A",
+              "B",
+              "none"
+            ],
+            "properties": {
+              "A": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "B": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "none": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              }
+            }
+          }
+        }
+      }
+    },
+    "processing_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_frames",
+        "processed_frames",
+        "elapsed_s"
+      ],
+      "properties": {
+        "source_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "processed_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "elapsed_s": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "drift_warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "start_s",
+          "end_s",
+          "message"
+        ],
+        "properties": {
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

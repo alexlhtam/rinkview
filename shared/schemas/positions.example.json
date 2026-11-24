@@ -1,0 +1,16 @@
+[
+  {
+    "t": 0,
+    "frame": 0,
+    "track_id": 1,
+    "role": "player",
+    "team": "A",
+    "x_m": -2,
+    "y_m": 1,
+    "vx": 0,
+    "vy": 0,
+    "conf": 0.9,
+    "on_ice": true,
+    "interpolated": false
+  }
+]
