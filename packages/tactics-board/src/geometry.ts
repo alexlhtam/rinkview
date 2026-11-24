@@ -4,7 +4,6 @@ export const PADDING = 1.6
 export const distance = ([ax, ay]: Point, [bx, by]: Point) => Math.hypot(ax - bx, ay - by)
 export const toSvg = ([x, y]: Point): Point => [x, -y]
 export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
-export const roundTime = (t: number) => Math.round(t * 1000) / 1000
 
 export function rinkGeometry(rink: RinkTemplate) {
   const x = rink.length_m / 2

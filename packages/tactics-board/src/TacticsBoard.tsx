@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent } from 'react'
 import { BoardSurface, INK } from './BoardSurface'
 import { createClip, newId, parseClip, serializeClip, setKeyframe } from './clip'
 import { download, rinkPng } from './export'
-import { clamp, clampToIce, distance, pointInView, roundTime } from './geometry'
+import { clamp, clampToIce, distance, pointInView } from './geometry'
 import { historyOf, push, redo, undo } from './history'
 import { Icon } from './Icons'
 import { boardPlayers, ghostMarkerKey, ghostMarkers, teamColor } from './players'
@@ -57,7 +57,6 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   const annotations = layers.annotations
     ? clip.annotations_json.filter(a => a.t_from <= playhead && playhead <= a.t_to) : []
   const dragging = draft && 'player' in draft ? draft : undefined
-  const activeTime = clamp(roundTime(playhead), clip.start_t, clip.end_t)
 
   useEffect(() => {
     if (committed.current === clip) return
@@ -169,7 +168,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
       }))
       return
     }
-    const t = activeTime
+    const t = playhead
     const keyframe = { t, x_m: point[0], y_m: point[1] }
     edit(previous => {
       const existing = previous.ghosts_json.find((ghost, index) => ghostMarkerKey(ghost, index) === player.key)

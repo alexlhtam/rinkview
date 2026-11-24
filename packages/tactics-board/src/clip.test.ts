@@ -85,6 +85,16 @@ describe('ghost animation', () => {
     expect(frames).toEqual([last])
   })
 
+  it('replaces an imported key at its exact time without modifying a nearby key', () => {
+    const clip = createClip()
+    const first = { t: 1.2345, x_m: 2, y_m: 4 }
+    const second = { t: 1.235, x_m: 3, y_m: 6 }
+    clip.ghosts_json = [{ track_id: 10, team: 'B', keyframes: [first, second] }]
+    const [{ keyframes }] = parseClip(serializeClip(clip)).ghosts_json
+    const revised = { ...keyframes[0], x_m: 5 }
+    expect(setKeyframe(keyframes, revised)).toEqual([revised, second])
+  })
+
   it('resolves tracked ghosts against the frozen source, and hides both when the source is hidden', () => {
     const source: PositionSample = {
       t: 18, frame: 180, track_id: 10, role: 'goalie', team: 'B',
