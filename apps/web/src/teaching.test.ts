@@ -56,8 +56,22 @@ describe('teaching draft', () => {
     const draft = { clip: { ...clip, title: 'Defensive coverage' }, savedClip: clip };
     const sameFrame = await teachingFrame(game, 2.08, 5, new Map());
     const confirmDiscard = vi.fn(() => false);
-    expect(switchTeachingDraft(draft, sameFrame.clip, false, confirmDiscard)).toBe(draft);
+    expect(switchTeachingDraft(draft, sameFrame.clip, false, 60, confirmDiscard)).toBe(draft);
     expect(confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('restores an edited imported clip when its start is within half a frame of the frozen timestamp', async () => {
+    const { clip } = await teachingFrame(game, 2.106, 5, new Map());
+    const imported = parseClip(serializeClip(clip));
+    const draft = { clip: { ...imported, title: 'Defensive coverage' }, savedClip: imported };
+    const displayedFrame = await teachingFrame(game, 2.1, 5, new Map());
+    const nextFrame = await teachingFrame(game, 2.1 + 1 / 60, 5, new Map());
+    const confirmDiscard = vi.fn(() => false);
+
+    expect(switchTeachingDraft(draft, displayedFrame.clip, false, 60, confirmDiscard)).toBe(draft);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(switchTeachingDraft(draft, nextFrame.clip, false, 60, confirmDiscard)).toBeNull();
+    expect(confirmDiscard).toHaveBeenCalledOnce();
   });
 
   it('keeps unsaved edits on cancel and switches to a different frame on confirmation', async () => {
@@ -65,9 +79,9 @@ describe('teaching draft', () => {
     const draft = { clip: { ...clip, notes: 'Cover the slot' }, savedClip: clip };
     const differentFrame = await teachingFrame(game, 4.2, 5, new Map());
     const confirmDiscard = vi.fn(() => false).mockReturnValueOnce(false).mockReturnValueOnce(true);
-    expect(switchTeachingDraft(draft, differentFrame.clip, false, confirmDiscard)).toBeNull();
-    expect(switchTeachingDraft(draft, clip, false, confirmDiscard)).toBe(draft);
-    expect(switchTeachingDraft(draft, differentFrame.clip, false, confirmDiscard))
+    expect(switchTeachingDraft(draft, differentFrame.clip, false, 60, confirmDiscard)).toBeNull();
+    expect(switchTeachingDraft(draft, clip, false, 60, confirmDiscard)).toBe(draft);
+    expect(switchTeachingDraft(draft, differentFrame.clip, false, 60, confirmDiscard))
       .toEqual({ clip: differentFrame.clip, savedClip: differentFrame.clip });
     expect(confirmDiscard).toHaveBeenCalledTimes(2);
   });
@@ -77,7 +91,7 @@ describe('teaching draft', () => {
     const saved = { ...clip, title: 'Defensive coverage' };
     const differentFrame = await teachingFrame(game, 4.2, 5, new Map());
     const confirmDiscard = vi.fn(() => false);
-    expect(switchTeachingDraft({ clip: saved, savedClip: saved }, differentFrame.clip, false, confirmDiscard))
+    expect(switchTeachingDraft({ clip: saved, savedClip: saved }, differentFrame.clip, false, 60, confirmDiscard))
       .toEqual({ clip: differentFrame.clip, savedClip: differentFrame.clip });
     expect(confirmDiscard).not.toHaveBeenCalled();
   });

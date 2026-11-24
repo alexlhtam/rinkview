@@ -14,9 +14,9 @@ export function canDiscardTeachingDraft(current: TeachingDraft | null, confirmDi
 }
 
 export function switchTeachingDraft(
-  current: TeachingDraft | null, nextClip: TeachingClip, loadingClip: boolean, confirmDiscard: () => boolean,
+  current: TeachingDraft | null, nextClip: TeachingClip, loadingClip: boolean, fps: number, confirmDiscard: () => boolean,
 ): TeachingDraft | null {
-  if (!loadingClip && current?.clip.start_t === nextClip.start_t) return current;
+  if (!loadingClip && current && Math.abs(current.clip.start_t - nextClip.start_t) <= 0.5 / fps) return current;
   if (!canDiscardTeachingDraft(current, confirmDiscard)) return null;
   return { clip: nextClip, savedClip: nextClip };
 }

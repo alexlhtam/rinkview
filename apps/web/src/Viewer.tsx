@@ -101,7 +101,7 @@ export function Viewer({ game, ref }: { game: GameData; ref?: Ref<ViewerHandle> 
   async function openBoard(loaded?: TeachingClip) {
     const startedAt = pauseAtDisplayedFrame();
     const next = await teachingFrame(game, startedAt, duration, overrides, loaded);
-    const draft = switchTeachingDraft(boardDraft.current, next.clip, Boolean(loaded),
+    const draft = switchTeachingDraft(boardDraft.current, next.clip, Boolean(loaded), fps,
       () => window.confirm('Discard unsaved edits to the current Teaching Clip?'));
     if (!draft) return;
     boardDraft.current = draft;
