@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RinkView Teaching Clip",
+  "description": "A coaching board in rink metres (centre origin, +y toward the far boards). All times are seconds on the source video timeline, or seconds from zero for standalone clips. Annotation and keyframe times lie within start_t and end_t.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "start_t",
+    "end_t",
+    "title",
+    "notes",
+    "tags",
+    "annotations_json",
+    "ghosts_json",
+    "hidden_track_ids",
+    "added_players_json",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "video_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "start_t": {
+      "$ref": "#/$defs/time"
+    },
+    "end_t": {
+      "$ref": "#/$defs/time"
+    },
+    "title": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "annotations_json": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/annotation"
+      }
+    },
+    "ghosts_json": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ghost"
+      }
+    },
+    "hidden_track_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/trackId"
+      }
+    },
+    "added_players_json": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/addedPlayer"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time": {
+      "type": "number",
+      "minimum": 0
+    },
+    "trackId": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "team": {
+      "enum": [
+        "A",
+        "B",
+        "none"
+      ]
+    },
+    "point": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 2
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "t_from",
+        "t_to",
+        "points_m",
+        "style"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "arrow",
+            "pass",
+            "line",
+            "pen",
+            "zone",
+            "label",
+            "spotlight",
+            "measure"
+          ]
+        },
+        "t_from": {
+          "$ref": "#/$defs/time"
+        },
+        "t_to": {
+          "$ref": "#/$defs/time"
+        },
+        "points_m": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/point"
+          }
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string",
+              "pattern": "^#[a-fA-F0-9]{6}$"
+            },
+            "text": {
+              "type": "string"
+            },
+            "shape": {
+              "enum": [
+                "rectangle",
+                "polygon"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "label",
+                  "spotlight"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "points_m": {
+                "type": "array",
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "arrow",
+                  "pass",
+                  "line",
+                  "measure"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "points_m": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "pen"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "points_m": {
+                "type": "array",
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "zone"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "points_m": {
+                "type": "array",
+                "minItems": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    "keyframe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t",
+        "x_m",
+        "y_m"
+      ],
+      "properties": {
+        "t": {
+          "$ref": "#/$defs/time"
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        }
+      }
+    },
+    "ghost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_id",
+        "team",
+        "keyframes"
+      ],
+      "properties": {
+        "track_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/trackId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "team": {
+          "$ref": "#/$defs/team"
+        },
+        "keyframes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/keyframe"
+          }
+        },
+        "player_id": {
+          "description": "Links a null-track ghost to an optional board-added player.",
+          "$ref": "#/$defs/id"
+        }
+      },
+      "dependentSchemas": {
+        "player_id": {
+          "properties": {
+            "track_id": {
+              "const": null
+            }
+          }
+        }
+      }
+    },
+    "addedPlayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "team",
+        "role",
+        "x_m",
+        "y_m"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "team": {
+          "$ref": "#/$defs/team"
+        },
+        "role": {
+          "enum": [
+            "player",
+            "goalie",
+            "referee"
+          ]
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

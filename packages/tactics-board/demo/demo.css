@@ -1,0 +1,25 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; color: #edf4ff; background: #0a1528; }
+body { margin: 0; background: radial-gradient(ellipse at 60% -10%, #1b3958, transparent 55%), #0a1528; min-height: 100vh; }
+.demo-shell { width: min(100% - 48px, 1440px); margin: 0 auto; }
+.demo-nav { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #30435d; padding: 17px 0; }
+.demo-brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 19px; letter-spacing: -.05em; line-height: 1.02; }
+.demo-brand > span > span { color: #73e8ce; }
+.demo-brand small { display: block; font-size: 8px; letter-spacing: .15em; color: #afc2d8; margin-top: 5px; }
+.demo-badge { padding: 5px 9px; border: 1px solid #456480; border-radius: 999px; color: #d2e1f3; font-size: 11px; }
+.demo-badge i { display: inline-block; width: 6px; height: 6px; background: #73e8ce; border-radius: 100%; margin-right: 4px; }
+.demo-intro { display: flex; justify-content: space-between; align-items: end; gap: 10px; flex-wrap: wrap; padding: 15px 0; }
+.demo-intro h1 { margin: 0; font-size: clamp(28px, 3vw, 41px); line-height: 1.04; letter-spacing: -.055em; }
+.demo-intro p { margin: 5px 0 0; color: #b4c7df; font-size: 13px; }
+.demo-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.demo-actions label { font-size: 11px; color: #b4c7df; }
+.demo-actions select, .demo-actions button {
+  border: 1px solid #456480; border-radius: 6px; background: #152b47; color: #edf4ff;
+  padding: 6px 9px; font: 600 12px system-ui, sans-serif; min-height: 32px; cursor: pointer;
+}
+.demo-actions select { margin-left: 4px; }
+.demo-actions .demo-example { color: #73e8ce; border-color: #3b777b; background: #183c47; }
+.demo-actions button:hover, .demo-actions select:hover { background: #234b64; }
+.demo-actions :focus-visible { outline: 2px solid #73e8ce; outline-offset: 2px; }
+.demo-footer { display: flex; justify-content: space-between; gap: 7px; color: #a3b9d3; padding: 12px 0; font-size: 10px; }
+.demo-footer span:first-child { letter-spacing: .11em; font-weight: 700; }
+@media (max-width: 550px) { .demo-shell { width: calc(100% - 20px); } }
