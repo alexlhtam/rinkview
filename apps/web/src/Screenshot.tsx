@@ -38,7 +38,7 @@ function readCalibration(value: unknown): ScreenshotCalibration {
 
 const saved = [p1, p2, p3].map(readCalibration);
 const teams = ['A', 'B', 'none'] as const;
-type Picture = { file: File; url: string; size: Point };
+type Picture = { file: File; url: string; size: Point; preview: HTMLImageElement };
 type Detection = { foot_px: Point; bbox: Marker['bbox']; role: Role; team: Team; x_m?: number; y_m?: number };
 
 function label(id: string) { return id.replaceAll('_', ' '); }
@@ -66,6 +66,7 @@ export function Screenshot({ active }: { active: boolean }) {
   const [selected, setSelected] = useState('');
   const [add, setAdd] = useState(false);
   const [board, setBoard] = useState<TeachingClip>();
+  const savedBoard = useRef<TeachingClip>(undefined);
   const [boardOpen, setBoardOpen] = useState(false);
   const [includeThumbnail, setIncludeThumbnail] = useState(false);
   const [names, setNames] = useState({ A: 'Team A', B: 'Team B', none: 'Unassigned' });
@@ -114,7 +115,7 @@ export function Screenshot({ active }: { active: boolean }) {
       preview.src = url;
       await preview.decode();
       if (ticket !== request.current) { URL.revokeObjectURL(url); return; }
-      setPicture({ file, url, size: [preview.naturalWidth, preview.naturalHeight] });
+      setPicture({ file, url, size: [preview.naturalWidth, preview.naturalHeight], preview });
       setCalibration(undefined);
       setPairs([]);
       setLandmark('');
@@ -206,32 +207,33 @@ export function Screenshot({ active }: { active: boolean }) {
     }
   }
 
-  async function sendToBoard() {
+  function sendToBoard() {
     if (!picture) return;
+    if (board && board !== savedBoard.current
+      && !window.confirm('Discard unsaved edits to the current Teaching Clip?')) return;
     let thumbnail: string | undefined;
     if (includeThumbnail) {
-      const image = new Image();
-      image.src = picture.url;
       try {
-        await image.decode();
         const canvas = document.createElement('canvas');
         const scale = Math.min(1, 240 / Math.max(...picture.size));
         [canvas.width, canvas.height] = picture.size.map(value => Math.max(1, Math.round(value * scale)));
-        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')?.drawImage(picture.preview, 0, 0, canvas.width, canvas.height);
         thumbnail = canvas.toDataURL('image/jpeg', .8);
       } catch {
         setError('Could not embed a thumbnail. Retry without the thumbnail.');
         return;
       }
     }
-    setBoard({
+    const clip: TeachingClip = {
       ...createClip(), title: picture.file.name, screenshot: {
         filename: picture.file.name, thumbnail,
       },
       added_players_json: projected.filter(p => p.inRink).map(({ marker, x, y }) => ({
         id: marker.id, x_m: x, y_m: y, team: marker.team, role: marker.role,
       })),
-    });
+    };
+    savedBoard.current = clip;
+    setBoard(clip);
     setBoardOpen(true);
   }
 
@@ -245,7 +247,8 @@ export function Screenshot({ active }: { active: boolean }) {
     {board && boardOpen ? <section className="teaching-panel">
       <div className="panel-head"><div><h2>Screenshot whiteboard</h2><p>{board.screenshot?.filename}</p></div>
         <button onClick={() => setBoardOpen(false)}>Back to screenshot</button></div>
-      <TacticsBoard rinkTemplate={rink} initialClip={board} onChange={setBoard} teamColors={colors} teamNames={names} />
+      <TacticsBoard rinkTemplate={rink} initialClip={board} onChange={setBoard}
+        onSaveClip={clip => { savedBoard.current = clip; }} teamColors={colors} teamNames={names} />
     </section> : <section className="workspace screenshot" onDragOver={event => event.preventDefault()} onDrop={event => {
       event.preventDefault();
       if (event.dataTransfer.files[0]) void openPicture(event.dataTransfer.files[0]);
@@ -372,7 +375,7 @@ export function Screenshot({ active }: { active: boolean }) {
               <button onClick={() => { dispatch({ type: 'delete', id: choice.id }); setSelected(''); }}>Delete marker</button>
             </>}
             <label><input type="checkbox" checked={includeThumbnail} onChange={event => setIncludeThumbnail(event.target.checked)} /> Include thumbnail</label>
-            <button className="primary" disabled={!projected.some(p => p.inRink)} onClick={() => void sendToBoard()}>Send to whiteboard</button>
+            <button className="primary" disabled={!projected.some(p => p.inRink)} onClick={sendToBoard}>Send to whiteboard</button>
             {board && <button onClick={() => setBoardOpen(true)}>Reopen whiteboard draft</button>}
           </div>
           <p>{add ? 'Click the skate point in the screenshot.' : `${markers.length} markers · ${projected.filter(p => p.inRink).length} on the rink. Drag markers on the screenshot to correct them.`}</p>
