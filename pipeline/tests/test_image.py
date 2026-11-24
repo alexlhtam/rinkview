@@ -50,7 +50,7 @@ def test_analyze_endpoint_filters_and_projects(screenshot):
         "homography": [[.3, 0, -24], [0, -.3, 12], [0, 0, 1]],
         "ice_mask_polygon": [[2, 10], [128, 10], [128, 76], [2, 76]],
     }
-    client = TestClient(create_app(Detector()))
+    client = TestClient(create_app(Detector()), headers={"X-RinkView-Client": "web"})
     files = {"image": ("test.png", screenshot.read_bytes(), "image/png")}
     assert client.post("/analyze", files=files).status_code == 200
     data = {"calibration": json.dumps(calibration), "rink": rink.read_text()}
@@ -61,3 +61,21 @@ def test_analyze_endpoint_filters_and_projects(screenshot):
     assert points[0]["x_m"] == pytest.approx(-17.1)
     assert points[0]["y_m"] == pytest.approx(-5.595)
     assert client.post("/analyze", files={"image": ("broken.png", b"x")}).status_code == 422
+
+
+def test_analyze_requires_client_header_and_restricts_preflight(screenshot):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from rinkview_cv.server import create_app
+
+    class NoInference:
+        def detect(self, image, crop):
+            pytest.fail("Blocked requests must not run inference")
+
+    client = TestClient(create_app(NoInference()))
+    untrusted = "https://untrusted.example"
+    files = {"image": ("test.png", screenshot.read_bytes(), "image/png")}
+    assert client.post("/analyze", files=files, headers={"Origin": untrusted}).status_code == 403
+    headers = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "X-RinkView-Client"}
+    assert client.options("/analyze", headers={**headers, "Origin": untrusted}).status_code == 400
+    assert client.options("/analyze", headers={**headers, "Origin": "http://localhost:5173"}).status_code == 200

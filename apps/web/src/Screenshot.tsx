@@ -186,7 +186,7 @@ export function Screenshot({ active }: { active: boolean }) {
       data.set('image', picture.file);
       data.set('calibration', JSON.stringify(calibration));
       data.set('rink', JSON.stringify(rink));
-      const response = await fetch('/api/analyze', { method: 'POST', body: data });
+      const response = await fetch('/api/analyze', { method: 'POST', headers: { 'X-RinkView-Client': 'web' }, body: data });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(typeof body?.detail === 'string' ? body.detail : 'Could not analyze screenshot. Check that rinkview serve is running.');
