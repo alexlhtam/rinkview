@@ -77,7 +77,10 @@ function App() {
       </div></header>
       <main className="shell">
         <nav className="controls mode-switch" aria-label="Coaching workspace mode">
-          <button aria-pressed={mode === 'screenshot'} onClick={() => setMode('screenshot')}>Screenshot</button>
+          <button aria-pressed={mode === 'screenshot'} onClick={() => {
+            viewer.current?.pause();
+            setMode('screenshot');
+          }}>Screenshot</button>
           <button aria-pressed={mode === 'video'} onClick={() => setMode('video')}>Video add-on</button>
         </nav>
         {mode === 'screenshot' && <div className="page-heading">

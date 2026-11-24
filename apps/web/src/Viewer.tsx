@@ -43,6 +43,7 @@ function FrameIcon({ back }: { back?: boolean }) {
 
 export interface ViewerHandle {
   confirmDiscardDraft(): boolean;
+  pause(): void;
 }
 
 export function Viewer({ game, ref }: { game: GameData; ref?: Ref<ViewerHandle> }) {
@@ -76,7 +77,8 @@ export function Viewer({ game, ref }: { game: GameData; ref?: Ref<ViewerHandle> 
   useImperativeHandle(ref, () => ({
     confirmDiscardDraft: () => canDiscardTeachingDraft(boardDraft.current,
       () => window.confirm('Discard unsaved Teaching Clip edits and open these game files?')),
-  }), []);
+    pause: () => videoRef.current?.pause(),
+  }), [videoRef]);
 
   useEffect(() => {
     if (board) return;
