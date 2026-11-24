@@ -1,10 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const defaultTemplate = new URL('../../../shared/rink_templates/ally-pally-estimate.json', import.meta.url);
 const defaultOutput = new URL('../../../data/web-demo/', import.meta.url);
 const [output, template, sourceRate = '60'] = process.argv.slice(2);
-const outputDir = output ? resolve(output) : defaultOutput.pathname;
+const outputDir = output ? resolve(output) : fileURLToPath(defaultOutput);
 const rink = JSON.parse(await readFile(template ?? defaultTemplate, 'utf8'));
 const fps = Number(sourceRate);
 if (!Number.isFinite(fps) || fps < 10) throw new Error('Source frame rate must be at least 10 fps.');
