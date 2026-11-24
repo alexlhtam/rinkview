@@ -63,6 +63,24 @@ def test_yolo_adapter_preserves_custom_roles_and_full_frame_coordinates(monkeypa
     ]
 
 
+def test_tile_dedup_keeps_overlapping_different_classes():
+    def result(boxes):
+        data = SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: np.array(boxes)))
+        return SimpleNamespace(boxes=SimpleNamespace(data=data))
+
+    detector = YoloDetector.__new__(YoloDetector)
+    detector.device = "cpu"
+    detector.roles = {0: "player", 1: "goalie"}
+    detector.model = SimpleNamespace(predict=lambda *_args, **_kwargs: [
+        result([[1200, 20, 1240, 80, .9, 0]]),
+        result([[136, 20, 176, 80, .8, 0], [136, 20, 176, 80, .7, 1]]),
+    ])
+    assert detector.detect(np.zeros((160, 2600, 3), np.uint8), (0, 0, 2600, 160)) == [
+        Detection((1200, 20, 1240, 80), .9, "player"),
+        Detection((1200, 20, 1240, 80), .7, "goalie"),
+    ]
+
+
 def test_ice_mask_board_fallback_and_rounded_corner(rink):
     calib = Calibration(
         rink, (3840, 2160), np.array([[.1, 0, -30], [0, -.05, 15], [0, 0, 1]]),

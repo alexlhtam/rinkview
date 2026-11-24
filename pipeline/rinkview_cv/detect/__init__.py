@@ -55,13 +55,15 @@ class YoloDetector:
             [image[y1:y2, x1:x2] for x1, y1, x2, y2 in tiles],
             imgsz=1280, conf=0.12, classes=list(self.roles), device=self.device, verbose=False,
         )
-        found = []
+        by_role = {}
         for (left, top, _, _), result in zip(tiles, results):
             for x1, y1, x2, y2, conf, cls in result.boxes.data.cpu().numpy():
                 box = (float(x1 + left), float(y1 + top), float(x2 + left), float(y2 + top))
-                found.append(Detection(box, float(conf), self.roles[int(cls)]))
-        if not found:
-            return []
-        boxes = [(x1, y1, x2 - x1, y2 - y1) for x1, y1, x2, y2 in (item.xyxy for item in found)]
-        indices = cv2.dnn.NMSBoxes(boxes, [item.conf for item in found], 0.10, 0.45)
-        return [found[int(index)] for index in indices]
+                role = self.roles[int(cls)]
+                by_role.setdefault(role, []).append(Detection(box, float(conf), role))
+        kept = []
+        for group in by_role.values():
+            boxes = [(x1, y1, x2 - x1, y2 - y1) for x1, y1, x2, y2 in (item.xyxy for item in group)]
+            indices = cv2.dnn.NMSBoxes(boxes, [item.conf for item in group], 0.10, 0.45)
+            kept.extend(group[int(index)] for index in indices)
+        return sorted(kept, key=lambda item: -item.conf)
