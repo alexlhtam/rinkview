@@ -136,7 +136,9 @@ export function TrackRink({ rink, samples, sample, dots, trails, selected, overr
       ctx.fill();
       ctx.lineWidth = p.role === 'goalie' ? 2.2 : 1.25;
       ctx.strokeStyle = p.role === 'goalie' ? '#182f4c' : '#fff';
+      if (p.interpolated) ctx.setLineDash([2, 2]);
       ctx.stroke();
+      if (p.interpolated) ctx.setLineDash([]);
       if (ids || p.track_id === selected) {
         ctx.fillStyle = '#122642';
         ctx.strokeStyle = '#f7faff';

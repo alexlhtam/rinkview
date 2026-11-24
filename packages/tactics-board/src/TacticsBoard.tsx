@@ -22,7 +22,7 @@ type Movable = Player | GhostMarker
 type Drag = { tool: 'move' | 'ghost'; player: Movable; start: Point; point: Point }
 type Draft = Stroke | Drag
 
-export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange }: TacticsBoardProps) {
+export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onSaveClip, onOpenClip, teamColors, teamNames }: TacticsBoardProps) {
   const [history, setHistory] = useState(() =>
     historyOf(initialClip ?? createClip(initialPlayers[0]?.t ?? 0)))
   const clip = history.current
@@ -340,6 +340,10 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
   async function loadClip(file: File) {
     try {
       const loaded = parseClip(await file.text())
+      if (onOpenClip) {
+        await onOpenClip(loaded)
+        return
+      }
       clearDraft()
       seek(loaded.start_t)
       setSelected(null)
@@ -422,7 +426,10 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <button aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!history.future.length} onClick={() => visitHistory(redo)}><Icon name="redo" /></button>
           <span className="rvb-command-divider" />
           <button onClick={() => fileInput.current?.click()}><Icon name="upload" /> Load JSON</button>
-          <button onClick={() => download(new Blob([serializeClip(clip)], { type: 'application/json' }), `${filename}.json`)}><Icon name="download" /> Save JSON</button>
+          <button onClick={() => {
+            download(new Blob([serializeClip(clip)], { type: 'application/json' }), `${filename}.json`)
+            onSaveClip?.(clip)
+          }}><Icon name="download" /> Save JSON</button>
           <button disabled={playing || Boolean(preview || measureAnchor)} onClick={() => void exportPng()}><Icon name="image" /> Export PNG</button>
           <input type="file" aria-label="Load Teaching Clip" accept=".json,application/json" hidden ref={fileInput}
             onChange={event => {
@@ -448,7 +455,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <span>{rinkTemplate.length_m} × {rinkTemplate.width_m} m</span>
         </div>
         <div className="rvb-ice">
-          <BoardSurface template={rinkTemplate} players={displayPlayers}
+          <BoardSurface template={rinkTemplate} players={displayPlayers} teamColors={teamColors}
             ghosts={temporaryGhost ? [...displayGhosts.filter(g => g.key !== temporaryGhost.key), temporaryGhost] : displayGhosts}
             annotations={preview ? [...displayAnnotations, preview] : displayAnnotations}
             selected={selected} presentation={presenting} surfaceRef={surface} rinkRef={rink}
@@ -466,7 +473,9 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
             onChange={event => setText(event.target.value)} />}
           {tool === 'player' && <div className="rvb-context-controls">
             <select aria-label="New player team" value={team} onChange={event => setTeam(event.target.value as Team)}>
-              <option value="A">Team A</option><option value="B">Team B</option><option value="none">Neutral</option>
+              <option value="A">{teamNames?.A ?? 'Team A'}</option>
+              <option value="B">{teamNames?.B ?? 'Team B'}</option>
+              <option value="none">{teamNames?.none ?? 'Neutral'}</option>
             </select>
             <select aria-label="New player role" value={role} onChange={event => setRole(event.target.value as Role)}>
               <option value="player">Skater</option><option value="goalie">Goalie</option><option value="referee">Referee</option>
@@ -520,8 +529,9 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <div className="rvb-bounds">
             {(['start_t', 'end_t'] as const).map(bound => <label key={bound}>{bound === 'start_t' ? 'Start (s)' : 'End (s)'}
               <input type="number" min="0" step="any" key={clip[bound]} defaultValue={clip[bound]}
+                readOnly={Boolean(onOpenClip) && bound === 'start_t'}
                 onBlur={event => {
-                  if (!changeRange(bound, event.target.valueAsNumber)) event.target.value = String(clip[bound])
+                  if (!event.target.readOnly && !changeRange(bound, event.target.valueAsNumber)) event.target.value = String(clip[bound])
                 }} />
             </label>)}
           </div>
@@ -541,7 +551,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
         </div>
         {selectedMarker && <div className="rvb-inspector-block">
           <h2><span className="rvb-team-dot" style={{
-            background: teamColor(selectedMarker.team, selectedPlayer?.role),
+            background: teamColor(selectedMarker.team, selectedPlayer?.role, teamColors),
           }} />{selectedPlayer ? `Player ${selectedPlayer.caption}` : 'Ghost player'}</h2>
           {selectedPlayer && initialPlayers.find(p => p.track_id === selectedPlayer.trackId)?.on_ice !== false &&
             <button onClick={() => toggleHidden(selectedPlayer)}>{selectedPlayer.hidden ? 'Show player' : 'Hide player'}</button>}

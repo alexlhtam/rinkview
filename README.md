@@ -1,33 +1,83 @@
 # RinkView
 
-RinkView aims to turn fixed-camera ice hockey footage into a top-down rink view
-for reviewing team positioning, spacing and coverage. The first target is
-post-game coaching, not player identification or measurement-grade tracking.
-The prototype includes a calibration overlay, a pipeline that tracks skaters
-and exports positions and analytics, a local Game Viewer, and a separate
-coaching tactics board. It does not run live.
+RinkView turns ice hockey screenshots into editable player positions on a
+coaching whiteboard. The MVP is for post-game review of positioning, spacing
+and coverage, not player identification or measurement-grade tracking.
+The fixed-camera video pipeline and Game Viewer are available as an add-on.
 
 ## Repository layout
 
 | Directory | Purpose |
 |---|---|
-| `pipeline/` | Independent Python package and tests; no API or database required |
+| `pipeline/` | Python vision CLI, local screenshot API and tests; no database required |
 | `packages/tactics-board/` | Standalone React tactics board, demo and embeddable component |
 | `shared/` | Rink templates, sample calibrations and output schemas |
 | `scripts/` | Optional sample clip retrieval |
-| `apps/web/` | Local Game Viewer |
-| `apps/api/` | Reserved for the API |
+| `apps/web/` | Screenshot review, whiteboard and optional Game Viewer |
 | `worker/`, `training/`, `infra/` | Reserved for background processing, training and deployment |
 | `docs/` | [MVP spec](docs/spec.md) |
 
-## Coaching tactics board
+## Screenshot MVP quickstart
 
-Run the standalone demo with Node.js 22.12+ (or Node.js 24 LTS) and npm:
+Install Python 3.10+ and Node.js 22.12+ (or Node 24 LTS). From the repository
+root, create and activate a virtual environment (on Windows use
+`.venv\Scripts\Activate.ps1`), then run:
 
 ```sh
-cd packages/tactics-board
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e './pipeline[image,test]'
+rinkview serve --device cpu
+```
+
+In another terminal:
+
+```sh
 npm ci
 npm run dev
+```
+
+Open the URL shown by Vite. The **Screenshot** mode is the default:
+
+1. Drop, paste or choose a screenshot from the game.
+2. Select a saved calibration only if it is for the **same camera view**, not
+   just the same resolution. For a new view, choose a rink template, click four
+   or more named landmarks spread across the ice, and fit the calibration.
+   Check the projected lines and reprojection RMS in metres. If the projection
+   includes spectators or benches, trace the visible ice before analyzing.
+   Download the JSON
+   for later use (place it next to the shared calibrations for CLI use).
+3. Select **Analyze screenshot**. Correct the proposed positions by dragging
+   skate markers, deleting false positives, adding missing players, or choosing
+   a different team or role. You can also do this entirely by hand without the
+   detector. Name the teams and choose their colors.
+4. **Send to whiteboard** to annotate the corrected positions. **Save JSON**
+   retains the positions and screenshot filename, and includes a small image
+   only if you selected **Include thumbnail**. Load the JSON on the same rink.
+
+The API binds only to `127.0.0.1:8000`; Vite proxies the analysis request there.
+The model may download its weights on first run, but your images are not
+uploaded. Detections and jersey clustering are suggestions: nearby spectators,
+occlusion, dark jerseys, and small or non-standard referee kits can cause
+misclassifications. The generic detector does not distinguish goalies.
+
+To run a single image without the web app:
+
+```sh
+rinkview detect-image screenshot.jpg --calib shared/calibrations/ally-pally-side-p1.json --device cpu
+```
+
+Omit `--calib` for image-space detections only. Use `--device cuda` with
+CUDA-enabled PyTorch (see [GPU setup](#running-on-your-gpu-windows--rtx-4080-super)).
+
+## Coaching tactics board
+
+Run the standalone demo from the repo root with Node.js 22.12+ (or Node.js 24 LTS) and npm:
+
+```sh
+npm ci
+npm run dev --workspace @rinkview/tactics-board
 ```
 
 Start with a blank rink or choose **Load example**. Use **Add player** to place
@@ -53,7 +103,7 @@ board). Moving a tracked player creates a correction without changing the
 source. When reopening a clip backed by video, supply the same frozen frame and
 rink template to show its original tracked players.
 
-## CPU quickstart
+## Video add-on: CPU quickstart
 
 From the repo root, with Python 3.10+:
 
@@ -127,34 +177,38 @@ current JavaScript challenges. If access legitimately requires your own local
 browser session, pass `--cookies-from-browser firefox` (or your browser and
 profile). Do not export or share cookies.
 
-## Run the Game Viewer
+## Video add-on: Run the Game Viewer
 
-Use Node.js 22.12+ and a current browser. From the repo root:
+Use Node.js 22.12+ and a current browser. From the repo root, run `npm ci` once,
+then start the viewer with:
 
 ```sh
-npm --prefix apps/web ci
-npm --prefix apps/web run generate:demo
-npm --prefix apps/web run dev
+npm run dev
 ```
 
-Open the URL printed by Vite. Choose the 30-second P1 sample clip or another
-local video, `data/web-demo/positions.json`, `data/web-demo/summary.json` and
-`shared/rink_templates/ally-pally-estimate.json`, then select **Open game**.
-The default template matches the P1 calibration. The generated 14 tracks are
-**synthetic**, not detections from the video: they share the video clock but
-do not correspond to specific players on screen. The clip is not included in
-the repository. No files are uploaded or sent to a backend.
+Open the URL printed by Vite and switch to **Video add-on**. Choose the same **Match video** you processed
+(or a time-aligned playback copy), select the **Pipeline output folder** (for
+example `data/outputs/p1` from the CPU quickstart), and pick the **Camera
+calibration** used by the pipeline. Then select **Open game**. If your browser
+does not offer folder selection, choose `positions.json` and `summary.json`
+individually. Files stay on your device.
 
-To review real tracks, open the same source clip you processed and load the
-pipeline's `positions.json` and `summary.json` instead of the demo files.
-Use the rink template referenced by that clip's calibration.
+The viewer reads `rink_template` from the calibration. It can resolve the
+bundled templates or a relative file inside the selected folder when the
+folder includes `calibration.json`. Select a **Rink template override** for a
+custom template the viewer cannot resolve. Without a calibration or override,
+the viewer uses the bundled Alexandra Palace sample rink.
+
+For a UI demo without running the pipeline, use
+`npm run generate:demo --workspace @rinkview/web` and choose `data/web-demo`
+as the output folder. The demo tracks are **synthetic** and don't identify
+players in the video. The video itself is not included.
 
 The original 4K clip works in browsers that can decode it smoothly. If needed,
-make a 1080p H.264 copy (preserving the start time and using the synthetic
-data's default 60 fps for frame stepping):
+make a 1080p H.264 copy without changing the start time or frame rate:
 
 ```sh
-ffmpeg -i p1_4k_30s.mp4 -map 0:v:0 -vf "scale=1920:-2,fps=60" -c:v libx264 -pix_fmt yuv420p -t 30 data/p1_1080p_30s.mp4
+ffmpeg -i data/p1_4k_30s.mp4 -map 0:v:0 -vf scale=1920:-2 -c:v libx264 -pix_fmt yuv420p data/p1_1080p_30s.mp4
 ```
 
 Use the shared timeline to scrub, play at 0.25–2×, or step through the
@@ -162,6 +216,13 @@ video. Frame stepping estimates the source rate from the positions export
 (30 fps fallback); variable-frame-rate video may not step exactly one frame.
 Select a rink dot or use the track editor to reassign its team for the whole
 track. Team corrections affect the rink, not the imported analytics.
+Dashed marker outlines indicate estimated positions between detections.
+Select **Freeze → Tactics board** to pause at the displayed frame and bring
+the nearest on-ice tracks and current team assignments onto the board. Use
+**Save JSON** to save a Teaching Clip and **Open Teaching Clip** with the same
+video and outputs to reopen it at its saved timestamp. Team overrides are
+session-local. **Back to video** returns to the paused match.
+
 Use **I**/**O** outside form fields to mark a review range, then open
 **Review clips** to name it or export saved ranges as JSON. Changes and clips
 are available until you replace the game or reload the page.

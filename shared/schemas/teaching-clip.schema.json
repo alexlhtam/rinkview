@@ -32,6 +32,15 @@
     "start_t": {
       "$ref": "#/$defs/time"
     },
+    "screenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename"],
+      "properties": {
+        "filename": {"type": "string", "minLength": 1},
+        "thumbnail": {"type": "string", "pattern": "^data:image/(jpeg|png|webp);base64,", "maxLength": 250000}
+      }
+    },
     "end_t": {
       "$ref": "#/$defs/time"
     },

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import type { FormEvent, Ref } from 'react';
+import { TacticsBoard, parseClip } from '@rinkview/tactics-board/source';
+import type { TeachingClip } from '@rinkview/tactics-board/source';
 import type { GameData } from './data';
 import type { Team } from './contracts';
 import { TrackRink } from './Rink';
@@ -10,6 +12,9 @@ import { Insights } from './Insights';
 import { makeClip } from './clips';
 import type { Clip } from './clips';
 import { activityBars } from './timeline';
+import { canDiscardTeachingDraft, switchTeachingDraft, teachingFrame } from './teaching';
+import type { TeachingDraft } from './teaching';
+import { TEAM_COLORS } from './rinkGeometry';
 
 const FILTERS = [
   { key: 'A', label: 'Team A' },
@@ -36,8 +41,13 @@ function FrameIcon({ back }: { back?: boolean }) {
     style={{ transform: back ? 'scaleX(-1)' : undefined }}><path d="M5 4.5 13 10l-8 5.5zm9 0h1.8v11H14z" /></svg>;
 }
 
-export function Viewer({ game }: { game: GameData }) {
-  const { videoRef, time, duration, playing, speed, error, seek, step, toggle, changeSpeed } = usePlayback();
+export interface ViewerHandle {
+  confirmDiscardDraft(): boolean;
+  pause(): void;
+}
+
+export function Viewer({ game, ref }: { game: GameData; ref?: Ref<ViewerHandle> }) {
+  const { videoRef, time, duration, playing, speed, error, seek, step, toggle, changeSpeed, pauseAtDisplayedFrame } = usePlayback();
   const { samples, windowError } = usePositionWindow(game.positions, time);
   const { filters, toggleFilter, trails, setTrails, ids, toggleIds } = useViewSettings();
   const [selected, setSelected] = useState<number | null>(null);
@@ -45,6 +55,14 @@ export function Viewer({ game }: { game: GameData }) {
   const [inPoint, setIn] = useState<number | null>(null);
   const [outPoint, setOut] = useState<number | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
+  const [board, setBoard] = useState<(Awaited<ReturnType<typeof teachingFrame>> & { revision: number }) | null>(null);
+  const [boardError, setBoardError] = useState('');
+  const [boardPending, setBoardPending] = useState(false);
+  const boardTitle = useRef<HTMLHeadingElement>(null);
+  const freezeButton = useRef<HTMLButtonElement>(null);
+  const teachingInput = useRef<HTMLInputElement>(null);
+  const boardRevision = useRef(0);
+  const boardDraft = useRef<TeachingDraft | null>(null);
   const sample = findSample(samples, time);
   const dots = useMemo(() => sample?.positions.filter(p => p.on_ice && filters[p.role === 'referee'
     ? 'referee' : effectiveTeam(p, overrides)]) ?? [], [filters, overrides, sample]);
@@ -56,7 +74,14 @@ export function Viewer({ game }: { game: GameData }) {
   const bars = useMemo(() => activityBars(game.activity, duration), [game.activity, duration]);
   const soloPeriod = game.summary.periods.length === 1 ? game.summary.periods[0].period : undefined;
 
+  useImperativeHandle(ref, () => ({
+    confirmDiscardDraft: () => canDiscardTeachingDraft(boardDraft.current,
+      () => window.confirm('Discard unsaved Teaching Clip edits and open these game files?')),
+    pause: () => videoRef.current?.pause(),
+  }), [videoRef]);
+
   useEffect(() => {
+    if (board) return;
     function hotkey(event: KeyboardEvent) {
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat
         || (event.target instanceof HTMLElement && (event.target.isContentEditable || event.target.closest('input, select, textarea')))) return;
@@ -69,7 +94,42 @@ export function Viewer({ game }: { game: GameData }) {
     }
     window.addEventListener('keydown', hotkey);
     return () => window.removeEventListener('keydown', hotkey);
-  }, [videoRef]);
+  }, [board, videoRef]);
+
+  useEffect(() => {
+    if (board) boardTitle.current?.focus();
+  }, [board]);
+
+  async function openBoard(loaded?: TeachingClip) {
+    const startedAt = pauseAtDisplayedFrame();
+    const next = await teachingFrame(game, startedAt, duration, overrides, loaded);
+    const draft = switchTeachingDraft(boardDraft.current, next.clip, Boolean(loaded), fps,
+      () => window.confirm('Discard unsaved edits to the current Teaching Clip?'));
+    if (!draft) return;
+    boardDraft.current = draft;
+    if (loaded) seek(next.clip.start_t);
+    setBoard({ ...next, clip: draft.clip, revision: ++boardRevision.current });
+  }
+
+  function updateBoardClip(clip: TeachingClip) {
+    if (boardDraft.current) boardDraft.current = { ...boardDraft.current, clip };
+  }
+
+  function markBoardClipSaved(clip: TeachingClip) {
+    if (boardDraft.current) boardDraft.current = { clip, savedClip: clip };
+  }
+
+  async function showBoard(file?: File) {
+    setBoardError('');
+    setBoardPending(true);
+    try {
+      await openBoard(file ? parseClip(await file.text()) : undefined);
+    } catch (cause) {
+      setBoardError(cause instanceof Error ? cause.message : 'Could not open the tactics board.');
+    } finally {
+      setBoardPending(false);
+    }
+  }
 
   function saveClip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,6 +154,21 @@ export function Viewer({ game }: { game: GameData }) {
 
   return (
     <>
+      {board && <section className="teaching-panel" aria-labelledby="teaching-title">
+        <div className="panel-head">
+          <div><h2 id="teaching-title" ref={boardTitle} tabIndex={-1}>Frozen frame · {stamp(board.clip.start_t, true)}</h2>
+            <p>{board.players.length ? `${board.players.length} tracked players from the nearest sample.`
+              : 'No tracks at this timestamp. Add players manually or return to the video.'}</p></div>
+          <button onClick={() => {
+            setBoard(null);
+            requestAnimationFrame(() => freezeButton.current?.focus());
+          }}>Back to video</button>
+        </div>
+        <TacticsBoard key={board.revision} rinkTemplate={game.rink}
+          initialPlayers={board.players} initialClip={board.clip} onOpenClip={openBoard}
+          onChange={updateBoardClip} onSaveClip={markBoardClipSaved} teamColors={TEAM_COLORS} />
+      </section>}
+      <div hidden={Boolean(board)}>
       <div className="workspace">
         <div className="stage-grid">
           <section className="stage video-stage" aria-labelledby="video-title">
@@ -116,7 +191,7 @@ export function Viewer({ game }: { game: GameData }) {
                 overrides={overrides} ids={ids} onSelect={setSelected} />
             </div>
             <div className="rink-caption"><span>{windowError || `${dots.length} visible tracks`}</span>
-              <span>10 Hz · nearest sample</span></div>
+              <span>10 Hz · nearest sample · dashed = interpolated</span></div>
           </section>
         </div>
         <section className="timeline" aria-label="Shared timeline">
@@ -158,6 +233,19 @@ export function Viewer({ game }: { game: GameData }) {
                   <i className={`team-dot team-${key}`} />{label}</button>)}
               <button className="filter-button" aria-pressed={ids} onClick={toggleIds}>IDs</button>
             </div>
+          </div>
+          <div className="controls teaching-actions">
+            <button className="primary" ref={freezeButton} onClick={() => void showBoard()} disabled={!duration || boardPending}>
+              Freeze → Tactics board
+            </button>
+            <button onClick={() => teachingInput.current?.click()} disabled={!duration || boardPending}>Open Teaching Clip</button>
+            <input ref={teachingInput} type="file" accept=".json,application/json" aria-label="Open Teaching Clip JSON"
+              hidden onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) void showBoard(file);
+              }} />
+            {boardError && <span role="alert">{boardError}</span>}
           </div>
         </section>
       </div>
@@ -210,6 +298,7 @@ export function Viewer({ game }: { game: GameData }) {
         </div>
       </details>
       <footer>RinkView · Local review session <span>{SAMPLE_HZ} Hz tracking data · Time shown from video start</span></footer>
+      </div>
     </>
   );
 }

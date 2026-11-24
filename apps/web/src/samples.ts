@@ -1,7 +1,7 @@
 import type { Position, Team } from './contracts';
 
 export const SAMPLE_HZ = 10;
-const SAMPLE_TOLERANCE = 1.5 / SAMPLE_HZ;
+export const SAMPLE_TOLERANCE = 1.5 / SAMPLE_HZ;
 export const WINDOW_SECONDS = 60;
 export const MAX_TRAIL_SECONDS = 5;
 

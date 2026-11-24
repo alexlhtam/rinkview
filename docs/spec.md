@@ -1,6 +1,6 @@
-# RinkView: Ice Hockey Positional Tracking for Coaches (MVP Spec)
+# RinkView: Screenshot-to-Whiteboard for Ice Hockey Coaches
 
-Status: draft v3 · Owner: Alex (sole developer) · Target: post-game web app, running locally on a Windows PC with an RTX 4080 Super
+Status: draft v4 · Owner: Alex (sole developer) · Target: post-game web app, running locally on a Windows PC with an RTX 4080 Super
 
 ---
 
@@ -13,12 +13,12 @@ This is a **coaching and demonstration tool, not a measurement system**. A posit
 Coaches at UK rinks record games on a single fixed camera. They have no affordable way to turn that footage into a top-down view of where players were, which they need for reviewing systems, spacing, forechecks and breakouts.
 
 ### 1.2 MVP goals
-1. Upload a game video from a **fixed** camera (behind the goal on the glass, or a side tripod).
-2. Calibrate the camera to the rink once per camera setup by clicking known rink landmarks.
-3. Automatically detect and track players, then assign each one to Team A, Team B, Referee or Goalie.
-4. Show a synced **video + 2D rink** view with player dots, trails, scrubbing and playback speed.
-5. **Coaching board tools:** freeze any moment on the 2D rink, then annotate it (arrows, lines, zones, spotlights). Drag players to where they *should* have been ("ghost" positions) and save it as a teaching clip.
-6. Analysis outputs: team and opponent heatmaps, zone time, average team shape, gaps between defenders, and CSV/JSON export.
+1. Drop, paste, or select a screenshot from a game.
+2. Reuse a calibration for the same camera view or click at least four named landmarks. Show projected rink markings, reprojection error in metres, and provide downloadable calibration JSON.
+3. Use a local detector to propose skate positions, teams and available roles. Show screenshot and top-down rink side by side; support adding, dragging, deleting and relabelling markers, with coach-defined team names and colours.
+4. Send reviewed positions to the editable whiteboard and save a Teaching Clip JSON with the screenshot filename and, optionally, a thumbnail.
+
+Fixed-camera video tracking, playback, trails, freeze-frame and time-based analytics are a **video add-on**, not MVP requirements.
 
 ### 1.3 Non-goals (MVP)
 - Identifying individual players (jersey numbers or names).
@@ -31,12 +31,10 @@ Coaches at UK rinks record games on a single fixed camera. They have no affordab
 ### 1.4 Success criteria (coaching grade)
 | Metric | Target |
 |---|---|
-| Skaters on ice shown on the 2D rink | ≥ 85% of the time (≥ 70% in the far half for the behind-goal camera) |
+| Skaters on ice shown on the 2D rink | Visible skaters can be corrected or added manually if auto-detection misses them |
 | Position error (median) | ≤ 2 m (≤ 4 m in the far half for the behind-goal camera). Enough to show gaps, lanes and coverage. |
-| Team assignment accuracy | ≥ 95% of track-frames after one-click fixes |
-| ID consistency | Not a goal for MVP (team-level only). Short fragmented tracks are fine. |
-| Processing time, 60-min game on the RTX 4080 Super | ≤ 30 min |
-| Time from opening a game to the first annotated freeze-frame | ≤ 1 min |
+| Team and role assignment | Visually verify and correct in the marker review panel |
+| Time from opening a calibrated screenshot to a usable whiteboard | Target ≤ 1 min, including review |
 
 ---
 
@@ -44,7 +42,14 @@ Coaches at UK rinks record games on a single fixed camera. They have no affordab
 
 **Persona:** a coach or video analyst at a UK club, often not technical, working on a laptop after the game.
 
-### Flow A: first-time setup for a rink and camera
+### MVP flow: screenshot to whiteboard
+Open an image, fit or select a calibration, run analysis, review the markers,
+and send them to the board. The browser computes the manual homography and sends
+the image and calibration as multipart form data to the local `POST /analyze`
+API. No queue, object store, database, video export or account is required.
+See the [README](../README.md#screenshot-mvp-quickstart) for commands and GPU setup.
+
+### Video add-on flow A: first-time setup for a rink and camera
 1. Create a **Rink** by picking a preset (NHL 200×85 ft, IIHF 60×30 m, or Custom) and editing the dimensions to match.
 2. Create a **Camera Setup** for that rink, e.g. "Planet Ice Altrincham – behind home goal".
 3. Upload a short clip or a still frame and click 6–12 landmarks on the image, matched to the same points on a rink diagram.
@@ -80,7 +85,10 @@ Coaches at UK rinks record games on a single fixed camera. They have no affordab
 
 ---
 
-## 3. System architecture
+## 3. Video add-on and future architecture
+
+The remaining tracking, analytics, deployment and storage designs describe the
+optional video workflow and longer-term plans, not dependencies of the screenshot MVP.
 
 ```
                  ┌─────────────────────────┐

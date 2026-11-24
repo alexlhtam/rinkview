@@ -3,6 +3,8 @@
 import argparse
 import json
 import math
+import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import cv2
@@ -73,10 +75,36 @@ def main() -> None:
     process.add_argument("--team-a-jersey", choices=("light", "dark"), default="light",
                          help="choose which jersey cluster is Team A (default: light)")
     process.add_argument("--team-a-defends", choices=("left", "right"), help="override Team A's defending end")
+    image = commands.add_parser("detect-image", help="detect and classify players in a screenshot")
+    image.add_argument("image", type=Path)
+    image.add_argument("--calib", type=Path)
+    serve = commands.add_parser("serve", help="serve the local screenshot analysis API")
+    serve.add_argument("--port", type=int, default=8000)
+    for command in (image, serve):
+        command.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+        command.add_argument("--weights", default="yolo11s.pt")
     args = parser.parse_args()
     try:
         if args.command == "calib-overlay":
             _overlay(args.frame, args.calib, args.out)
+        elif args.command in ("detect-image", "serve"):
+            from rinkview_cv.detect import YoloDetector
+            try:
+                if args.command == "serve":
+                    import uvicorn
+                    from rinkview_cv.server import create_app
+
+                    uvicorn.run(create_app(YoloDetector(args.device, args.weights)), host="127.0.0.1", port=args.port)
+                else:
+                    from rinkview_cv.image import analyze_image
+                    from rinkview_cv.project.ice import Calibration
+
+                    config = Calibration.load(args.calib) if args.calib else None
+                    with redirect_stdout(sys.stderr):
+                        result = analyze_image(args.image.read_bytes(), YoloDetector(args.device, args.weights), config)
+                    print(json.dumps(result, allow_nan=False))
+            except ModuleNotFoundError as exc:
+                raise ValueError("install image analysis dependencies with pip install -e './pipeline[image]'") from exc
         elif args.command == "process":
             if not math.isfinite(args.fps) or args.fps <= 0:
                 raise ValueError("--fps must be positive and finite")

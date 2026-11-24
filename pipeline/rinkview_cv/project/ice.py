@@ -28,6 +28,10 @@ class Calibration:
     def load(cls, path: Path):
         config = json.loads(path.read_text(encoding="utf-8"))
         rink = load_rink_template(path.parent / config["rink_template"])
+        return cls.from_config(config, rink)
+
+    @classmethod
+    def from_config(cls, config: dict, rink: RinkTemplate):
         correction = RadialCorrection(**config["radial_correction"]) if "radial_correction" in config else None
         homography = np.asarray(config["homography"], dtype=float)
         outline = rink_to_image(rink.outline(), homography)
@@ -85,6 +89,11 @@ class IceDetection:
     estimated: bool
 
 
+def box_foot(detection: Detection):
+    x1, y1, x2, y2 = detection.xyxy
+    return ((x1 + x2) / 2, y2 - .03 * (y2 - y1))
+
+
 class IceFilter:
     def __init__(self, calibration: Calibration):
         self.calib = calibration
@@ -114,8 +123,8 @@ class IceFilter:
             height = y2 - y1
             if height <= 0 or x2 <= x1:
                 continue
-            x = (x1 + x2) / 2
-            foot = (x, y2 - .03 * height)
+            foot = box_foot(detection)
+            x = foot[0]
             board = float(np.interp(x, self.board_x, self.board_y)) if self.board_x else None
             if (board is not None and board - y2 >= 32 * self.scale
                     and detection.role in {"person", "player"} and detection.conf >= .4 and self._inside(foot)):

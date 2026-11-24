@@ -71,6 +71,7 @@ export interface Ghost {
 export interface TeachingClip {
   id: string
   video_id?: string | null
+  screenshot?: { filename: string; thumbnail?: string }
   start_t: number
   end_t: number
   title: string
@@ -89,4 +90,8 @@ export interface TacticsBoardProps {
   initialPlayers?: readonly PositionSample[]
   initialClip?: TeachingClip
   onChange?: (clip: TeachingClip) => void
+  onSaveClip?: (clip: TeachingClip) => void
+  onOpenClip?: (clip: TeachingClip) => Promise<void>
+  teamColors?: Readonly<Record<Team, string>>
+  teamNames?: Readonly<Record<Team, string>>
 }

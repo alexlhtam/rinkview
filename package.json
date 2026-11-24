@@ -1,0 +1,12 @@
+{
+  "name": "rinkview",
+  "private": true,
+  "workspaces": ["apps/web", "packages/tactics-board"],
+  "scripts": {
+    "dev": "npm run dev --workspace @rinkview/web",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "build": "npm run build --workspaces"
+  }
+}

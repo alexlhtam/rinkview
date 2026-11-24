@@ -4,7 +4,7 @@ import { distance, rinkGeometry, toSvg } from './geometry'
 import { Rink } from './Rink'
 import { teamColor } from './players'
 import type { GhostMarker, Player } from './players'
-import type { Annotation, Point, RinkTemplate } from './types'
+import type { Annotation, Point, RinkTemplate, TacticsBoardProps } from './types'
 
 export const INK = '#124eaa'
 export const EDITOR_MARKER_RADIUS = .74
@@ -81,11 +81,12 @@ interface SurfaceProps {
   onPointerCancel: PointerEventHandler<SVGSVGElement>
   cursor: string
   marker?: Point
+  teamColors?: TacticsBoardProps['teamColors']
 }
 
 export function BoardSurface({
   template, players, ghosts, annotations, selected, presentation, surfaceRef, rinkRef,
-  canvasRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, cursor, marker,
+  canvasRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, cursor, marker, teamColors,
 }: SurfaceProps) {
   const { width, height } = rinkGeometry(template)
   const viewBox = `${-width / 2} ${-height / 2} ${width} ${height}`
@@ -114,7 +115,7 @@ export function BoardSurface({
         ctx.globalAlpha = faded.has(player.key) ? .29 : 1
         ctx.beginPath()
         ctx.arc(x, y, markerRadius, 0, Math.PI * 2)
-        ctx.fillStyle = teamColor(player.team, player.role)
+        ctx.fillStyle = teamColor(player.team, player.role, teamColors)
         ctx.fill()
         ctx.strokeStyle = player.role === 'goalie' ? '#192843' : '#fff'
         ctx.lineWidth = player.role === 'goalie' ? .21 : .13
@@ -137,7 +138,7 @@ export function BoardSurface({
     const observer = new ResizeObserver(draw)
     observer.observe(area)
     return () => observer.disconnect()
-  }, [canvasRef, width, height, players, ghosts, selected, presentation])
+  }, [canvasRef, width, height, players, ghosts, selected, presentation, teamColors])
 
   return <div className="rvb-surface" ref={stack}
     style={{ aspectRatio: width / height, '--rvb-ratio': width / height } as CSSProperties}>
@@ -151,7 +152,7 @@ export function BoardSurface({
       {annotations.map(annotation => <BoardAnnotation key={annotation.id} annotation={annotation} />)}
       {ghosts.map(ghost => {
         const point = toSvg(ghost.point)
-        const color = teamColor(ghost.team, ghost.role)
+        const color = teamColor(ghost.team, ghost.role, teamColors)
         const radius = presentation ? .94 : EDITOR_MARKER_RADIUS
         const from = ghost.original ? toSvg(ghost.original) : undefined
         const length = from ? distance(from, point) : 0
