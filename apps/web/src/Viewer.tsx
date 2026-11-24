@@ -12,7 +12,8 @@ import { Insights } from './Insights';
 import { makeClip } from './clips';
 import type { Clip } from './clips';
 import { activityBars } from './timeline';
-import { teachingFrame } from './teaching';
+import { switchTeachingDraft, teachingFrame } from './teaching';
+import type { TeachingDraft } from './teaching';
 import { TEAM_COLORS } from './rinkGeometry';
 
 const FILTERS = [
@@ -56,6 +57,7 @@ export function Viewer({ game }: { game: GameData }) {
   const freezeButton = useRef<HTMLButtonElement>(null);
   const teachingInput = useRef<HTMLInputElement>(null);
   const boardRevision = useRef(0);
+  const boardDraft = useRef<TeachingDraft | null>(null);
   const sample = findSample(samples, time);
   const dots = useMemo(() => sample?.positions.filter(p => p.on_ice && filters[p.role === 'referee'
     ? 'referee' : effectiveTeam(p, overrides)]) ?? [], [filters, overrides, sample]);
@@ -90,8 +92,20 @@ export function Viewer({ game }: { game: GameData }) {
   async function openBoard(loaded?: TeachingClip) {
     const startedAt = pauseAtDisplayedFrame();
     const next = await teachingFrame(game, startedAt, duration, overrides, loaded);
+    const draft = switchTeachingDraft(boardDraft.current, next.clip, Boolean(loaded),
+      () => window.confirm('Discard unsaved edits to the current Teaching Clip?'));
+    if (!draft) return;
+    boardDraft.current = draft;
     if (loaded) seek(next.clip.start_t);
-    setBoard({ ...next, revision: ++boardRevision.current });
+    setBoard({ ...next, clip: draft.clip, revision: ++boardRevision.current });
+  }
+
+  function updateBoardClip(clip: TeachingClip) {
+    if (boardDraft.current) boardDraft.current = { ...boardDraft.current, clip };
+  }
+
+  function markBoardClipSaved(clip: TeachingClip) {
+    if (boardDraft.current) boardDraft.current = { clip, savedClip: clip };
   }
 
   async function showBoard(file?: File) {
@@ -140,7 +154,8 @@ export function Viewer({ game }: { game: GameData }) {
           }}>Back to video</button>
         </div>
         <TacticsBoard key={board.revision} rinkTemplate={game.rink}
-          initialPlayers={board.players} initialClip={board.clip} onOpenClip={openBoard} teamColors={TEAM_COLORS} />
+          initialPlayers={board.players} initialClip={board.clip} onOpenClip={openBoard}
+          onChange={updateBoardClip} onSaveClip={markBoardClipSaved} teamColors={TEAM_COLORS} />
       </section>}
       <div hidden={Boolean(board)}>
       <div className="workspace">

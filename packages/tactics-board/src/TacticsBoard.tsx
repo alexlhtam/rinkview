@@ -22,7 +22,7 @@ type Movable = Player | GhostMarker
 type Drag = { tool: 'move' | 'ghost'; player: Movable; start: Point; point: Point }
 type Draft = Stroke | Drag
 
-export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onOpenClip, teamColors }: TacticsBoardProps) {
+export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initialClip, onChange, onSaveClip, onOpenClip, teamColors }: TacticsBoardProps) {
   const [history, setHistory] = useState(() =>
     historyOf(initialClip ?? createClip(initialPlayers[0]?.t ?? 0)))
   const clip = history.current
@@ -426,7 +426,10 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
           <button aria-label="Redo" title="Redo (Ctrl/⌘ Shift Z)" disabled={!history.future.length} onClick={() => visitHistory(redo)}><Icon name="redo" /></button>
           <span className="rvb-command-divider" />
           <button onClick={() => fileInput.current?.click()}><Icon name="upload" /> Load JSON</button>
-          <button onClick={() => download(new Blob([serializeClip(clip)], { type: 'application/json' }), `${filename}.json`)}><Icon name="download" /> Save JSON</button>
+          <button onClick={() => {
+            download(new Blob([serializeClip(clip)], { type: 'application/json' }), `${filename}.json`)
+            onSaveClip?.(clip)
+          }}><Icon name="download" /> Save JSON</button>
           <button disabled={playing || Boolean(preview || measureAnchor)} onClick={() => void exportPng()}><Icon name="image" /> Export PNG</button>
           <input type="file" aria-label="Load Teaching Clip" accept=".json,application/json" hidden ref={fileInput}
             onChange={event => {

@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseClip, serializeClip } from '@rinkview/tactics-board/source';
 import type { Position } from './contracts';
 import { groupSamples } from './samples';
-import { teachingFrame } from './teaching';
+import { switchTeachingDraft, teachingFrame } from './teaching';
 
 const player: Position = {
   t: 2.1, frame: 126, track_id: 8, x_m: 4, y_m: -4, vx: 0, vy: 0,
@@ -47,5 +47,38 @@ describe('teaching frame', () => {
   it('opens an empty board for a gap instead of guessing positions', async () => {
     const result = await teachingFrame(game, 4.2, 5, new Map());
     expect(result.players).toEqual([]);
+  });
+});
+
+describe('teaching draft', () => {
+  it('restores edits when refreezing the same frame without asking to discard them', async () => {
+    const { clip } = await teachingFrame(game, 2.08, 5, new Map());
+    const draft = { clip: { ...clip, title: 'Defensive coverage' }, savedClip: clip };
+    const sameFrame = await teachingFrame(game, 2.08, 5, new Map());
+    const confirmDiscard = vi.fn(() => false);
+    expect(switchTeachingDraft(draft, sameFrame.clip, false, confirmDiscard)).toBe(draft);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('keeps unsaved edits on cancel and switches to a different frame on confirmation', async () => {
+    const { clip } = await teachingFrame(game, 2.08, 5, new Map());
+    const draft = { clip: { ...clip, notes: 'Cover the slot' }, savedClip: clip };
+    const differentFrame = await teachingFrame(game, 4.2, 5, new Map());
+    const confirmDiscard = vi.fn(() => false).mockReturnValueOnce(false).mockReturnValueOnce(true);
+    expect(switchTeachingDraft(draft, differentFrame.clip, false, confirmDiscard)).toBeNull();
+    expect(switchTeachingDraft(draft, clip, false, confirmDiscard)).toBe(draft);
+    expect(switchTeachingDraft(draft, differentFrame.clip, false, confirmDiscard))
+      .toEqual({ clip: differentFrame.clip, savedClip: differentFrame.clip });
+    expect(confirmDiscard).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not warn after the current edits have been saved', async () => {
+    const { clip } = await teachingFrame(game, 2.08, 5, new Map());
+    const saved = { ...clip, title: 'Defensive coverage' };
+    const differentFrame = await teachingFrame(game, 4.2, 5, new Map());
+    const confirmDiscard = vi.fn(() => false);
+    expect(switchTeachingDraft({ clip: saved, savedClip: saved }, differentFrame.clip, false, confirmDiscard))
+      .toEqual({ clip: differentFrame.clip, savedClip: differentFrame.clip });
+    expect(confirmDiscard).not.toHaveBeenCalled();
   });
 });
