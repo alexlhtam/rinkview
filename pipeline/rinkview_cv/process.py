@@ -24,6 +24,12 @@ def process_video(
 ):
     if not np.isfinite(fps) or fps <= 0:
         raise ValueError("--fps must be positive and finite")
+    outputs = {(out / name).resolve() for name in (
+        "positions.json", "positions.parquet", "summary.json", "debug.mp4",
+    )}
+    for name, path in (("input video", video_path), ("calibration", calib_path)):
+        if path.resolve() in outputs:
+            raise ValueError(f"{name} path would be overwritten by output: {path}")
     start = perf_counter()
     cv2.setNumThreads(4)
     calibration = Calibration.load(calib_path)

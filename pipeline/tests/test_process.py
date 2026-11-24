@@ -216,3 +216,19 @@ def test_process_with_synthetic_detector_and_video(tmp_path):
     with av.open(str(out / "debug.mp4")) as debug:
         assert debug.streams.video[0].codec_context.name == "h264"
         assert len(list(debug.decode(video=0))) == 10
+
+
+@pytest.mark.parametrize(("video_name", "calib_name"), [
+    ("debug.mp4", "calib.json"),
+    ("source.mp4", "positions.json"),
+    ("source.mp4", "summary.json"),
+    ("positions.parquet", "calib.json"),
+])
+def test_process_rejects_output_overwriting_inputs(tmp_path, video_name, calib_name):
+    video, calib = tmp_path / video_name, tmp_path / calib_name
+    video.write_bytes(b"source video")
+    calib.write_bytes(b"calibration")
+    with pytest.raises(ValueError, match="would be overwritten by output"):
+        process_video(video, calib, tmp_path, None, 5)
+    assert video.read_bytes() == b"source video"
+    assert calib.read_bytes() == b"calibration"
