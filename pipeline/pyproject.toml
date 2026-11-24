@@ -11,6 +11,12 @@ dependencies = ["numpy>=1.23", "opencv-python-headless>=4.8,<6"]
 
 [project.optional-dependencies]
 test = ["pytest>=7", "jsonschema>=4.18"]
+process = [
+    "av>=14",
+    "pyarrow>=15",
+    "supervision>=0.25,<0.27",
+    "ultralytics>=8.3,<9",
+]
 
 [project.scripts]
 rinkview = "rinkview_cv.cli:main"

@@ -1,7 +1,8 @@
-"""Command-line rink calibration preview."""
+"""Command-line rink calibration preview and video processing."""
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import cv2
@@ -62,9 +63,33 @@ def main() -> None:
     overlay = commands.add_parser("calib-overlay", help="project rink markings onto a calibrated frame")
     for flag in ("frame", "calib", "out"):
         overlay.add_argument(f"--{flag}", type=Path, required=True)
+    process = commands.add_parser("process", help="track skaters and export rink positions from a video")
+    process.add_argument("video", type=Path)
+    process.add_argument("--calib", type=Path, required=True)
+    process.add_argument("--out", type=Path, required=True)
+    process.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    process.add_argument("--fps", type=float, default=10, help="detection sample rate (default: 10)")
+    process.add_argument("--weights", default="yolo11s.pt", help="Ultralytics detection weights (default: yolo11s.pt)")
+    process.add_argument("--team-a-defends", choices=("left", "right"), help="override Team A's defending end")
     args = parser.parse_args()
     try:
-        _overlay(args.frame, args.calib, args.out)
+        if args.command == "calib-overlay":
+            _overlay(args.frame, args.calib, args.out)
+        elif args.command == "process":
+            if not math.isfinite(args.fps) or args.fps <= 0:
+                raise ValueError("--fps must be positive and finite")
+            if not args.video.is_file() or not args.calib.is_file():
+                raise ValueError("video and calibration must be existing files")
+            try:
+                from rinkview_cv.detect import YoloDetector
+                from rinkview_cv.process import process_video
+            except ModuleNotFoundError as exc:
+                raise ValueError("install processing dependencies with pip install -e './pipeline[process]'") from exc
+
+            a_defends = {"left": -1, "right": 1}.get(args.team_a_defends)
+            print(process_video(
+                args.video, args.calib, args.out, YoloDetector(args.device, args.weights), args.fps, a_defends,
+            ))
     except (OSError, KeyError, ValueError, TypeError, cv2.error) as exc:
         parser.exit(2, f"rinkview: {exc}\n")
 

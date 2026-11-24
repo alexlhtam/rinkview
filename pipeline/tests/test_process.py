@@ -1,0 +1,218 @@
+import json
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+import cv2
+import jsonschema
+import numpy as np
+import pytest
+
+av = pytest.importorskip("av")
+pq = pytest.importorskip("pyarrow.parquet")
+pytest.importorskip("supervision")
+
+from rinkview_cv.calib import load_rink_template
+from rinkview_cv.detect import Detection, YoloDetector, horizontal_tiles
+from rinkview_cv.export import POSITIONS
+from rinkview_cv.io import sample_clock
+from rinkview_cv.process import process_video
+from rinkview_cv.project.ice import Calibration, IceDetection, IceFilter, clamp_to_rink
+from rinkview_cv.teams import Assignment, classify, jersey_features
+from rinkview_cv.track import Tracked, Tracker
+from rinkview_cv.track.positions import Observation, resample, stitch
+
+SHARED = Path(__file__).resolve().parents[2] / "shared"
+
+
+@pytest.fixture
+def rink():
+    return load_rink_template(SHARED / "rink_templates" / "ally-pally-estimate.json")
+
+
+def test_sampling_with_irregular_timestamps_and_detector_tiles():
+    frames = [(index, stamp, None) for index, stamp in enumerate([0., .026, .19, .21, .53, .54, .61])]
+    assert [i for i, _, _ in sample_clock(frames, 5)] == [0, 3, 4, 6]
+    tiles = list(horizontal_tiles((20, 100, 3860, 600)))
+    assert tiles[0][:2] == (20, 100)
+    assert tiles[-1][2:] == (3860, 600)
+    assert all(a[2] - b[0] >= 256 for a, b in zip(tiles, tiles[1:]))
+
+
+def test_yolo_adapter_preserves_custom_roles_and_full_frame_coordinates(monkeypatch):
+    class FakeModel:
+        names = {0: "player", 1: "goalie", 2: "referee", 3: "puck"}
+
+        def __init__(self, weights):
+            assert weights == "test.pt"
+
+        def predict(self, tiles, **kwargs):
+            assert [tile.shape for tile in tiles] == [(90, 80, 3)]
+            assert kwargs["classes"] == [0, 1, 2]
+            assert kwargs["device"] == "0"
+            data = SimpleNamespace(cpu=lambda: SimpleNamespace(numpy=lambda: np.array([[1, 3, 6, 8, .8, 2]])))
+            return [SimpleNamespace(boxes=SimpleNamespace(data=data))]
+
+    monkeypatch.setitem(sys.modules, "ultralytics", SimpleNamespace(YOLO=FakeModel))
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True)))
+    detector = YoloDetector("cuda", "test.pt")
+    assert detector.detect(np.zeros((150, 150, 3), np.uint8), (20, 30, 100, 120)) == [
+        Detection((21, 33, 26, 38), .8, "referee"),
+    ]
+
+
+def test_ice_mask_board_fallback_and_rounded_corner(rink):
+    calib = Calibration(
+        rink, (3840, 2160), np.array([[.1, 0, -30], [0, -.05, 15], [0, 0, 1]]),
+        np.array([[100, 100], [500, 100], [500, 400], [100, 400]], np.float32),
+        None, 1, True, (),
+    )
+    filter_ice = IceFilter(calib)
+    mentor = Detection((280, 220, 320, 320), .8)
+    for _ in range(8):
+        assert filter_ice.apply([mentor])[0].foot == (300, 317)
+    clipped = Detection((280, 299, 320, 377), .9)
+    spectator = Detection((280, 360, 320, 460), .9)
+    outside = Detection((35, 235, 65, 310), .9)
+    (result,) = filter_ice.apply([clipped, spectator, outside])
+    assert result.detection is clipped and result.estimated and result.on_ice
+    assert result.foot == (300, 396)
+    assert result.point == pytest.approx((0, -4.8))
+    assert filter_ice.apply([Detection((280, 320, 320, 396), .9)])[0].estimated is False
+
+    point = clamp_to_rink([rink.length_m / 2, rink.width_m / 2], rink)
+    assert point[1] == pytest.approx(rink.board_y(point[0]))
+
+
+def test_bytetrack_handles_empty_frame():
+    tracker = Tracker(5)
+    ice = IceDetection(Detection((10, 10, 30, 30), .9), (20, 29), (0, 0), True, False)
+    first = tracker.update([ice])
+    assert len(first) == 1
+    assert tracker.update([]) == []
+    assert tracker.update([ice])[0].track_id == first[0].track_id
+
+
+def test_bytetrack_keeps_original_boxes_at_sparse_sample_rates():
+    tracker = Tracker(5)
+    a = IceDetection(Detection((10, 10, 30, 34), .9), (20, 33), (0, 0), True, False)
+    b = IceDetection(Detection((27, 10, 47, 34), .9), (37, 33), (1, 0), True, False)
+    first, = tracker.update([a])
+    second, = tracker.update([b])
+    assert first.track_id == second.track_id
+    assert second.ice is b
+
+
+def observations(t0, count, track_id, color, x0=0, y0=0, role="player", step=.2):
+    image = np.full((60, 40, 3), color, np.uint8)
+    detection = Detection((0, 0, 40, 60), .9, role)
+    jersey = jersey_features(image, detection.xyxy)
+    return [
+        Observation(round(30 * t), t, Tracked(track_id, IceDetection(
+            detection, (20, 58), (x0 + i * .2, y0), True, False,
+        )), jersey)
+        for i in range(count) if (t := t0 + step * i) >= 0
+    ]
+
+
+def test_classification_and_explicit_roles(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 10, 1, navy),
+        2: observations(0, 10, 2, pale),
+        3: observations(0, 10, 3, pale, x0=rink.goal_x, role="goalie"),
+        4: observations(0, 10, 4, navy, role="referee"),
+    }
+    assigned, side = classify(tracks, rink)
+    assert assigned == {
+        1: Assignment("player", "A"), 2: Assignment("player", "B"),
+        3: Assignment("goalie", "B"), 4: Assignment("referee", "none"),
+    }
+    assert side == -1
+    assert classify(tracks, rink, a_defends=1)[0][3] == Assignment("goalie", "A")
+
+
+def test_team_fit_ignores_outlier_jerseys_at_the_boards_when_possible(rink):
+    tracks = {
+        1: observations(0, 10, 1, (170, 80, 35)),
+        2: observations(0, 10, 2, (110, 175, 220)),
+    }
+    for track_id in range(3, 9):
+        tracks[track_id] = observations(0, 10, track_id, (50, 180, 85), y0=-11)
+    labels, _ = classify(tracks, rink)
+    assert {labels[1].team, labels[2].team} == {"A", "B"}
+
+
+def test_stitch_filter_and_resample_without_extrapolation(rink):
+    navy, pale = (155, 60, 30), (245, 245, 245)
+    tracks = {
+        1: observations(0, 3, 1, navy),
+        2: observations(1.0, 5, 2, navy, x0=1),
+        3: observations(.8, 2, 3, pale, x0=1, y0=1),
+        4: observations(2.1, 2, 4, navy, x0=20),
+    }
+    labels = {i: Assignment("player", "A" if i != 3 else "B") for i in tracks}
+    merged, aliases = stitch(tracks, labels, 5)
+    assert aliases == {1: 1, 2: 1, 3: 3, 4: 4}
+    assert set(merged) == {1}
+    rows = resample(1, merged[1], labels[1], np.arange(90) / 30, rink)
+    assert [row["t"] for row in rows] == [i / 10 for i in range(19)]
+    assert [row["frame"] for row in rows] == [i * 3 for i in range(19)]
+    assert rows[1]["interpolated"] and rows[6]["interpolated"]
+    assert not rows[0]["interpolated"] and not rows[10]["interpolated"]
+    assert all(np.hypot(row["vx"], row["vy"]) <= 12.000001 for row in rows)
+
+
+def test_process_with_synthetic_detector_and_video(tmp_path):
+    video = tmp_path / "source.mp4"
+    with av.open(str(video), mode="w") as container:
+        stream = container.add_stream("libx264", rate=20)
+        stream.width, stream.height, stream.pix_fmt = 320, 180, "yuv420p"
+        image = np.full((180, 320, 3), 245, dtype=np.uint8)
+        cv2.rectangle(image, (105, 70), (134, 130), (160, 65, 30), -1)
+        cv2.rectangle(image, (185, 70), (214, 130), (237, 237, 237), -1)
+        for _ in range(40):
+            for packet in stream.encode(av.VideoFrame.from_ndarray(image, format="bgr24")):
+                container.mux(packet)
+        for packet in stream.encode():
+            container.mux(packet)
+
+    calib = tmp_path / "calib.json"
+    calib.write_text(json.dumps({
+        "image_size": [320, 180],
+        "rink_template": str(SHARED / "rink_templates" / "ally-pally-estimate.json"),
+        "source": {"period": 2},
+        "ice_mask_polygon": [[70, 60], [250, 60], [250, 140], [70, 140]],
+        "homography": [[.25, 0, -40], [0, -.2, 24], [0, 0, 1]],
+    }), encoding="utf-8")
+
+    class FakeDetector:
+        def detect(self, image, crop):
+            assert image.shape == (180, 320, 3)
+            assert crop[0] <= 70 and crop[2] >= 250
+            return [
+                Detection((105, 70, 134, 130), .95), Detection((185, 70, 214, 130), .9),
+                Detection((185, 95, 214, 170), .86),
+            ]
+
+    out = tmp_path / "out"
+    status = process_video(video, calib, out, FakeDetector(), 5, -1)
+    assert "20/30 detections kept" in status
+    rows = json.loads((out / "positions.json").read_text())
+    summary = json.loads((out / "summary.json").read_text())
+    for name, result in [("positions", rows), ("summary", summary)]:
+        schema = json.loads((SHARED / "schemas" / f"{name}.schema.json").read_text())
+        jsonschema.validate(result, schema)
+    table = pq.read_table(out / "positions.parquet")
+    assert table.schema == POSITIONS
+    assert table.to_pylist() == rows
+    assert len(rows) == 38
+    period = summary["periods"][0]
+    assert period["period"] == 2
+    assert period["track_counts"] == {"A": 1, "B": 1, "none": 0}
+    assert period["zone_time"]["A"]["defensive_s"] == period["zone_time"]["B"]["defensive_s"] == 1.9
+    assert np.sum(period["heatmaps"]["A"]["grid"]) == pytest.approx(1.9)
+    assert summary["processing_stats"]["source_frames"] == 40
+    with av.open(str(out / "debug.mp4")) as debug:
+        assert debug.streams.video[0].codec_context.name == "h264"
+        assert len(list(debug.decode(video=0))) == 10
