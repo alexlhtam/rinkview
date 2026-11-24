@@ -3,6 +3,15 @@ import type { PositionSource } from './data';
 import { MAX_TRAIL_SECONDS, WINDOW_SECONDS } from './samples';
 import type { Sample } from './samples';
 
+export function fallbackFrameTarget(time: number, direction: -1 | 1, fps: number, duration: number) {
+  const tolerance = 1e-7;
+  const current = Math.floor(time * fps + tolerance);
+  const last = Math.max(0, Math.ceil(duration * fps - tolerance) - 1);
+  const frame = Math.min(last, Math.max(0, current + direction));
+  const start = frame / fps;
+  return start + Math.min(0.25 / fps, (duration - start) / 2);
+}
+
 export function usePlayback() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastFrame = useRef<number | null>(null);
@@ -52,8 +61,10 @@ export function usePlayback() {
     const video = videoRef.current;
     if (!video) return;
     video.pause();
-    const displayed = lastFrame.current ?? video.currentTime;
-    seek(displayed + (direction + 0.25) / fps);
+    const displayed = lastFrame.current;
+    seek(displayed === null
+      ? fallbackFrameTarget(video.currentTime, direction, fps, duration)
+      : displayed + (direction + 0.25) / fps);
   }
 
   function changeSpeed(rate: number) {
