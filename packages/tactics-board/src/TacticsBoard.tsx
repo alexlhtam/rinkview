@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { BoardSurface, INK } from './BoardSurface'
-import { createClip, newId, parseClip, serializeClip, setKeyframe } from './clip'
+import { createClip, ghostKey, newId, parseClip, serializeClip, setKeyframe } from './clip'
 import { download, rinkPng } from './export'
 import { clamp, clampToIce, distance, pointInView } from './geometry'
 import { historyOf, push, redo, undo } from './history'
@@ -143,6 +143,7 @@ export function TacticsBoard({ rinkTemplate, initialPlayers = noPlayers, initial
 
   function visitHistory(action: typeof undo<TeachingClip>) {
     clearDraft()
+    if (selectedGhost && !ghostKey(selectedGhost)) setSelected(null)
     seek(currentTime)
     setHistory(action)
   }
