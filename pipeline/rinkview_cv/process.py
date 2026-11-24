@@ -16,11 +16,12 @@ from rinkview_cv.io.drift import DriftMonitor
 from rinkview_cv.project.ice import Calibration, IceFilter
 from rinkview_cv.teams import classify, jersey_features
 from rinkview_cv.track import Tracker
-from rinkview_cv.track.positions import Observation, resample, stitch
+from rinkview_cv.track.positions import Observation, resample, split_team_switches, stitch
 
 
 def process_video(
     video_path: Path, calib_path: Path, out: Path, detector: Detector, fps: float, a_defends: int | None = None,
+    *, team_a_jersey: str = "light",
 ):
     if not np.isfinite(fps) or fps <= 0:
         raise ValueError("--fps must be positive and finite")
@@ -56,7 +57,11 @@ def process_video(
             jersey = jersey_features(frame.image, item.ice.detection.xyxy)
             tracks[item.track_id].append(Observation(frame.index, frame.t, item, jersey))
 
-    labels, a_defends = classify(tracks, calibration.rink, a_defends)
+    raw_ids = len(tracks)
+    labels, a_defends, switches = classify(
+        tracks, calibration.rink, a_defends, team_a_jersey=team_a_jersey, switch_gap=max(.4, 1.5 / video.sample_fps),
+    )
+    split_team_switches(tracks, frames, labels, switches)
     cleaned, aliases = stitch(tracks, labels, video.sample_fps)
     source_times = np.asarray(video.times)
     rows = [
@@ -83,6 +88,6 @@ def process_video(
         f"{stats['kept']:,}/{stats['detections']:,} detections kept "
         f"({stats['detections'] - stats['kept']:,} rejected by ice/rink filter, "
         f"{stats['estimated']:,} estimated feet); {stats['tracked']:,} tracked detections; "
-        f"{len(tracks):,} raw IDs → {len(cleaned):,} cleaned tracks → {len(rows):,} position rows. "
+        f"{raw_ids:,} raw IDs → {len(cleaned):,} cleaned tracks → {len(rows):,} position rows. "
         f"Team A defends {'left' if a_defends == -1 else 'right'}. Outputs: {out}"
     )

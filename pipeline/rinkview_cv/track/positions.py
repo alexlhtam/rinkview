@@ -1,6 +1,6 @@
 """Stitch compatible track fragments, filter their motion, and export at 10 Hz."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil, floor
 
 import numpy as np
@@ -20,6 +20,23 @@ class Observation:
     t: float
     tracked: Tracked
     jersey: Jersey | None
+
+
+def split_team_switches(tracks, frames, labels, switches):
+    if not switches:
+        return
+    next_id = max(tracks) + 1
+    for track_id, (index, before, after) in sorted(switches.items()):
+        tail = []
+        for obs in tracks[track_id][index:]:
+            tracked = replace(obs.tracked, track_id=next_id)
+            tail.append(replace(obs, tracked=tracked))
+            frames[obs.frame] = [tracked if item.track_id == track_id else item for item in frames[obs.frame]]
+        tracks[track_id] = tracks[track_id][:index]
+        tracks[next_id] = tail
+        labels[track_id] = Assignment("player", before)
+        labels[next_id] = Assignment("player", after)
+        next_id += 1
 
 
 def stitch(tracks, labels, fps):
